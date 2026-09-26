@@ -1,7 +1,7 @@
 /* ============================================================
    DSP AUDIO SEPARATION STUDIO
-   Pure JavaScript / GitHub Pages
-   FFT + FIR + IIR
+   Pure JavaScript - GitHub Pages
+   FFT + FIR + IIR Audio Separation
    ============================================================ */
 
 const $ = id => document.getElementById(id);
@@ -15,6 +15,7 @@ let lastResult = null;
    ============================================================ */
 
 function setStatus(message, progress = null) {
+
     const status = $("status");
 
     if (status) {
@@ -22,10 +23,14 @@ function setStatus(message, progress = null) {
     }
 
     if (progress !== null) {
+
         const wrap = $("progressWrap");
         const bar = $("progressBar");
 
-        if (wrap) wrap.classList.remove("hidden");
+        if (wrap) {
+            wrap.classList.remove("hidden");
+        }
+
         if (bar) {
             bar.style.width =
                 `${Math.max(0, Math.min(100, progress))}%`;
@@ -35,7 +40,7 @@ function setStatus(message, progress = null) {
 
 
 /* ============================================================
-   FILE NAMES
+   FILE NAME DISPLAY
    ============================================================ */
 
 function setupFileName(inputId, labelId) {
@@ -49,8 +54,11 @@ function setupFileName(inputId, labelId) {
         const file = input.files[0];
 
         if ($(labelId)) {
+
             $(labelId).textContent =
-                file ? file.name : "Choose a WAV file";
+                file
+                    ? file.name
+                    : "Choose a WAV file";
         }
     });
 }
@@ -62,14 +70,19 @@ setupFileName("musicFile", "musicName");
 
 
 /* ============================================================
-   UTILITY
+   GENERAL UTILITIES
    ============================================================ */
 
 function nextOdd(n) {
 
-    n = Math.max(5, Math.floor(n));
+    n = Math.max(
+        5,
+        Math.floor(n)
+    );
 
-    return n % 2 === 0 ? n + 1 : n;
+    return n % 2 === 0
+        ? n + 1
+        : n;
 }
 
 
@@ -77,7 +90,12 @@ function normalize(x, peak = 0.95) {
 
     let maximum = 0;
 
-    for (let i = 0; i < x.length; i++) {
+    for (
+        let i = 0;
+        i < x.length;
+        i++
+    ) {
+
         maximum = Math.max(
             maximum,
             Math.abs(x[i])
@@ -88,21 +106,30 @@ function normalize(x, peak = 0.95) {
         return x.slice();
     }
 
-    const scale = peak / maximum;
+    const scale =
+        peak / maximum;
 
-    const out =
-        new Float32Array(x.length);
+    const output =
+        new Float32Array(
+            x.length
+        );
 
-    for (let i = 0; i < x.length; i++) {
-        out[i] = x[i] * scale;
+    for (
+        let i = 0;
+        i < x.length;
+        i++
+    ) {
+
+        output[i] =
+            x[i] * scale;
     }
 
-    return out;
+    return output;
 }
 
 
 /* ============================================================
-   AUDIO LOADING
+   AUDIO DECODING
    ============================================================ */
 
 function downmix(buffer) {
@@ -110,22 +137,34 @@ function downmix(buffer) {
     const channels =
         buffer.numberOfChannels;
 
-    const n =
+    const length =
         buffer.length;
 
     const output =
-        new Float32Array(n);
+        new Float32Array(length);
 
-    for (let c = 0; c < channels; c++) {
 
-        const channel =
-            buffer.getChannelData(c);
+    for (
+        let channel = 0;
+        channel < channels;
+        channel++
+    ) {
 
-        for (let i = 0; i < n; i++) {
+        const data =
+            buffer.getChannelData(channel);
+
+
+        for (
+            let i = 0;
+            i < length;
+            i++
+        ) {
+
             output[i] +=
-                channel[i] / channels;
+                data[i] / channels;
         }
     }
+
 
     return output;
 }
@@ -137,28 +176,39 @@ async function decodeFile(file) {
         window.AudioContext ||
         window.webkitAudioContext;
 
+
     const context =
         new AudioContextClass();
 
-    const buffer =
+
+    const arrayBuffer =
         await file.arrayBuffer();
+
 
     const decoded =
         await context.decodeAudioData(
-            buffer.slice(0)
+            arrayBuffer.slice(0)
         );
+
 
     const samples =
         downmix(decoded);
 
+
     const fs =
         decoded.sampleRate;
 
+
     await context.close();
 
+
     return {
-        samples: normalize(samples),
-        fs: fs
+
+        samples:
+            normalize(samples),
+
+        fs:
+            fs
     };
 }
 
@@ -167,7 +217,10 @@ async function decodeFile(file) {
    WAV ENCODER
    ============================================================ */
 
-function encodeWav(samples, sampleRate) {
+function encodeWav(
+    samples,
+    sampleRate
+) {
 
     const buffer =
         new ArrayBuffer(
@@ -175,24 +228,25 @@ function encodeWav(samples, sampleRate) {
             samples.length * 2
         );
 
+
     const view =
         new DataView(buffer);
 
 
     function writeString(
         offset,
-        string
+        text
     ) {
 
         for (
             let i = 0;
-            i < string.length;
+            i < text.length;
             i++
         ) {
 
             view.setUint8(
                 offset + i,
-                string.charCodeAt(i)
+                text.charCodeAt(i)
             );
         }
     }
@@ -200,21 +254,26 @@ function encodeWav(samples, sampleRate) {
 
     writeString(0, "RIFF");
 
+
     view.setUint32(
         4,
         36 + samples.length * 2,
         true
     );
 
+
     writeString(8, "WAVE");
 
+
     writeString(12, "fmt ");
+
 
     view.setUint32(
         16,
         16,
         true
     );
+
 
     view.setUint16(
         20,
@@ -222,11 +281,13 @@ function encodeWav(samples, sampleRate) {
         true
     );
 
+
     view.setUint16(
         22,
         1,
         true
     );
+
 
     view.setUint32(
         24,
@@ -234,11 +295,13 @@ function encodeWav(samples, sampleRate) {
         true
     );
 
+
     view.setUint32(
         28,
         sampleRate * 2,
         true
     );
+
 
     view.setUint16(
         32,
@@ -246,13 +309,16 @@ function encodeWav(samples, sampleRate) {
         true
     );
 
+
     view.setUint16(
         34,
         16,
         true
     );
 
+
     writeString(36, "data");
+
 
     view.setUint32(
         40,
@@ -288,6 +354,7 @@ function encodeWav(samples, sampleRate) {
             true
         );
 
+
         offset += 2;
     }
 
@@ -319,18 +386,25 @@ function attachAudio(
             fs
         );
 
+
     const url =
         URL.createObjectURL(blob);
 
+
     objectUrls.push(url);
 
+
     if ($(audioId)) {
-        $(audioId).src = url;
+
+        $(audioId).src =
+            url;
     }
+
 
     if ($(downloadId)) {
 
-        $(downloadId).href = url;
+        $(downloadId).href =
+            url;
 
         $(downloadId).download =
             filename;
@@ -340,7 +414,6 @@ function attachAudio(
 
 /* ============================================================
    FIR LOW-PASS
-   Hamming Window
    ============================================================ */
 
 function designFIRLowpass(
@@ -349,13 +422,17 @@ function designFIRLowpass(
     fs
 ) {
 
-    taps = nextOdd(taps);
+    taps =
+        nextOdd(taps);
+
 
     const h =
         new Float32Array(taps);
 
+
     const center =
         (taps - 1) / 2;
+
 
     const fc =
         cutoff / fs;
@@ -369,6 +446,7 @@ function designFIRLowpass(
 
         const k =
             n - center;
+
 
         let sinc;
 
@@ -412,6 +490,7 @@ function designFIRLowpass(
 
     let sum = 0;
 
+
     for (
         let i = 0;
         i < taps;
@@ -422,7 +501,10 @@ function designFIRLowpass(
     }
 
 
-    if (Math.abs(sum) > 1e-12) {
+    if (
+        Math.abs(sum) >
+        1e-12
+    ) {
 
         for (
             let i = 0;
@@ -456,8 +538,10 @@ function designFIRHighpass(
             fs
         );
 
+
     const high =
         new Float32Array(taps);
+
 
     const center =
         (taps - 1) / 2;
@@ -475,6 +559,7 @@ function designFIRHighpass(
 
 
     high[center] += 1;
+
 
     return high;
 }
@@ -539,8 +624,10 @@ async function convolveOffline(
     const convolver =
         context.createConvolver();
 
+
     convolver.normalize =
         false;
+
 
     convolver.buffer =
         impulse;
@@ -553,6 +640,7 @@ async function convolveOffline(
     source.connect(
         convolver
     );
+
 
     convolver.connect(
         context.destination
@@ -576,7 +664,7 @@ async function convolveOffline(
 
 
 /* ============================================================
-   IIR BUTTERWORTH
+   BUTTERWORTH Q VALUES
    ============================================================ */
 
 function butterworthQValues(order) {
@@ -635,8 +723,10 @@ function processBiquad(
     const cos =
         Math.cos(w0);
 
+
     const sin =
         Math.sin(w0);
+
 
     const alpha =
         sin /
@@ -648,7 +738,9 @@ function processBiquad(
     let b2;
 
 
-    if (type === "lowpass") {
+    if (
+        type === "lowpass"
+    ) {
 
         b0 =
             (1 - cos) / 2;
@@ -675,8 +767,10 @@ function processBiquad(
     const a0 =
         1 + alpha;
 
+
     let a1 =
         -2 * cos;
+
 
     let a2 =
         1 - alpha;
@@ -759,13 +853,18 @@ function iirFilter(
         );
 
 
-    if (order % 2 !== 0) {
+    if (
+        order % 2 !== 0
+    ) {
+
         order++;
     }
 
 
     const qValues =
-        butterworthQValues(order);
+        butterworthQValues(
+            order
+        );
 
 
     let output =
@@ -817,6 +916,7 @@ function reverseBits(
             (
                 value & 1
             );
+
 
         value >>>= 1;
     }
@@ -895,7 +995,9 @@ function fft(
 
         const angle =
             (
-                inverse ? 1 : -1
+                inverse
+                    ? 1
+                    : -1
             )
             *
             2 *
@@ -905,6 +1007,7 @@ function fft(
 
         const cos =
             Math.cos(angle);
+
 
         const sin =
             Math.sin(angle);
@@ -929,6 +1032,7 @@ function fft(
                 const even =
                     start + j;
 
+
                 const odd =
                     even + half;
 
@@ -946,6 +1050,7 @@ function fft(
                 const er =
                     real[even];
 
+
                 const ei =
                     imag[even];
 
@@ -953,12 +1058,14 @@ function fft(
                 real[even] =
                     er + tr;
 
+
                 imag[even] =
                     ei + ti;
 
 
                 real[odd] =
                     er - tr;
+
 
                 imag[odd] =
                     ei - ti;
@@ -1009,6 +1116,7 @@ async function fftSeparation(
 
     const frameSize =
         16384;
+
 
     const hop =
         frameSize / 2;
@@ -1123,15 +1231,18 @@ async function fftSeparation(
                 frameSize
             );
 
+
         const speechImag =
             new Float64Array(
                 frameSize
             );
 
+
         const musicReal =
             new Float64Array(
                 frameSize
             );
+
 
         const musicImag =
             new Float64Array(
@@ -1154,7 +1265,8 @@ async function fftSeparation(
             ) {
 
                 frequency =
-                    k * fs /
+                    k *
+                    fs /
                     frameSize;
 
             } else {
@@ -1241,7 +1353,8 @@ async function fftSeparation(
             report &&
             (
                 frame % 4 === 0 ||
-                frame === frameCount - 1
+                frame ===
+                    frameCount - 1
             )
         ) {
 
@@ -1280,6 +1393,7 @@ async function fftSeparation(
             speech[i] /=
                 weight[i];
 
+
             music[i] /=
                 weight[i];
         }
@@ -1298,7 +1412,7 @@ async function fftSeparation(
 
 
 /* ============================================================
-   METRICS
+   PERFORMANCE METRICS
    ============================================================ */
 
 function findBestLag(
@@ -1309,9 +1423,11 @@ function findBestLag(
 
     const step = 16;
 
+
     const maxLag =
         Math.floor(
-            maxLagSamples / step
+            maxLagSamples /
+            step
         );
 
 
@@ -1362,13 +1478,21 @@ function findBestLag(
             const x =
                 reference[i];
 
+
             const y =
                 estimated[j];
 
 
-            xy += x * y;
-            xx += x * x;
-            yy += y * y;
+            xy +=
+                x * y;
+
+
+            xx +=
+                x * x;
+
+
+            yy +=
+                y * y;
         }
 
 
@@ -1395,6 +1519,7 @@ function findBestLag(
 
                 bestCorrelation =
                     value;
+
 
                 bestLag =
                     lag * step;
@@ -1427,7 +1552,6 @@ function alignedSignals(
 
 
     let referenceStart = 0;
-
     let estimatedStart = 0;
 
 
@@ -1455,13 +1579,15 @@ function alignedSignals(
         reference:
             reference.slice(
                 referenceStart,
-                referenceStart + length
+                referenceStart +
+                length
             ),
 
         estimated:
             estimated.slice(
                 estimatedStart,
-                estimatedStart + length
+                estimatedStart +
+                length
             )
     };
 }
@@ -1481,6 +1607,7 @@ function correlation(
 
     const x =
         aligned.reference;
+
 
     const y =
         aligned.estimated;
@@ -1527,17 +1654,22 @@ function correlation(
     ) {
 
         const dx =
-            x[i] - meanX;
+            x[i] -
+            meanX;
+
 
         const dy =
-            y[i] - meanY;
+            y[i] -
+            meanY;
 
 
         numerator +=
             dx * dy;
 
+
         xx +=
             dx * dx;
+
 
         yy +=
             dy * dy;
@@ -1552,7 +1684,10 @@ function correlation(
 
     return denominator >
         1e-12
-        ? numerator / denominator
+
+        ? numerator /
+          denominator
+
         : 0;
 }
 
@@ -1571,6 +1706,7 @@ function calculateSNR(
 
     const x =
         aligned.reference;
+
 
     const y =
         aligned.estimated;
@@ -1599,6 +1735,7 @@ function calculateSNR(
         xy +=
             x[i] * y[i];
 
+
         yy +=
             y[i] * y[i];
     }
@@ -1626,7 +1763,8 @@ function calculateSNR(
 
 
         const error =
-            x[i] - estimate;
+            x[i] -
+            estimate;
 
 
         signalPower +=
@@ -1646,6 +1784,7 @@ function calculateSNR(
         errorPower <
         1e-15
     ) {
+
         return Infinity;
     }
 
@@ -1675,6 +1814,7 @@ function calculateRMSE(
     const x =
         aligned.reference;
 
+
     const y =
         aligned.estimated;
 
@@ -1701,6 +1841,7 @@ function calculateRMSE(
 
         xy +=
             x[i] * y[i];
+
 
         yy +=
             y[i] * y[i];
@@ -1745,8 +1886,10 @@ function formatMetric(value) {
     if (
         !Number.isFinite(value)
     ) {
+
         return "∞";
     }
+
 
     return value.toFixed(4);
 }
@@ -1780,49 +1923,63 @@ function metricsRow(
 
     return `
     <tr>
+
         <td>${method}</td>
 
-        <td>${formatMetric(
-            correlation(
-                speechRef,
-                speech
-            )
-        )}</td>
+        <td>
+            ${formatMetric(
+                correlation(
+                    speechRef,
+                    speech
+                )
+            )}
+        </td>
 
-        <td>${formatMetric(
-            correlation(
-                musicRef,
-                music
-            )
-        )}</td>
+        <td>
+            ${formatMetric(
+                correlation(
+                    musicRef,
+                    music
+                )
+            )}
+        </td>
 
-        <td>${formatMetric(
-            calculateSNR(
-                speechRef,
-                speech
-            )
-        )}</td>
+        <td>
+            ${formatMetric(
+                calculateSNR(
+                    speechRef,
+                    speech
+                )
+            )}
+        </td>
 
-        <td>${formatMetric(
-            calculateSNR(
-                musicRef,
-                music
-            )
-        )}</td>
+        <td>
+            ${formatMetric(
+                calculateSNR(
+                    musicRef,
+                    music
+                )
+            )}
+        </td>
 
-        <td>${formatMetric(
-            calculateRMSE(
-                speechRef,
-                speech
-            )
-        )}</td>
+        <td>
+            ${formatMetric(
+                calculateRMSE(
+                    speechRef,
+                    speech
+                )
+            )}
+        </td>
 
-        <td>${formatMetric(
-            calculateRMSE(
-                musicRef,
-                music
-            )
-        )}</td>
+        <td>
+            ${formatMetric(
+                calculateRMSE(
+                    musicRef,
+                    music
+                )
+            )}
+        </td>
+
     </tr>`;
 }
 
@@ -1853,7 +2010,7 @@ function clearCanvas(canvas) {
 
     const height =
         Math.max(
-            240,
+            300,
             Math.floor(
                 rect.height
             )
@@ -1901,13 +2058,9 @@ function clearCanvas(canvas) {
     );
 
 
-    /*
-       White background makes the graphs
-       much sharper when captured/screenshot.
-    */
-
     ctx.fillStyle =
         "#ffffff";
+
 
     ctx.fillRect(
         0,
@@ -1918,9 +2071,11 @@ function clearCanvas(canvas) {
 
 
     return {
+
         ctx,
         w: width,
         h: height
+
     };
 }
 
@@ -1935,16 +2090,17 @@ function drawAxes(
     h,
     xLabel,
     yLabel,
-    top = 42
+    top = 40
 ) {
 
     const left = 62;
-    const right = 24;
-    const bottom = 42;
+    const right = 25;
+    const bottom = 40;
 
 
     ctx.strokeStyle =
-        "#d9dee8";
+        "#dce1ea";
+
 
     ctx.lineWidth = 1;
 
@@ -1969,10 +2125,6 @@ function drawAxes(
     ctx.stroke();
 
 
-    /*
-       Horizontal zero/reference grid.
-    */
-
     const middle =
         top +
         (
@@ -1984,6 +2136,7 @@ function drawAxes(
 
     ctx.strokeStyle =
         "#edf0f5";
+
 
     ctx.beginPath();
 
@@ -2000,18 +2153,17 @@ function drawAxes(
     ctx.stroke();
 
 
-    /*
-       X axis label.
-    */
-
     ctx.fillStyle =
         "#68718b";
+
 
     ctx.font =
         "12px Arial";
 
+
     ctx.textAlign =
         "right";
+
 
     ctx.fillText(
         xLabel,
@@ -2020,23 +2172,23 @@ function drawAxes(
     );
 
 
-    /*
-       Y axis label.
-    */
-
     ctx.save();
 
+
     ctx.translate(
-        15,
+        16,
         h / 2
     );
+
 
     ctx.rotate(
         -Math.PI / 2
     );
 
+
     ctx.textAlign =
         "center";
+
 
     ctx.fillText(
         yLabel,
@@ -2044,20 +2196,23 @@ function drawAxes(
         0
     );
 
+
     ctx.restore();
 
 
     return {
+
         left,
         right,
         top,
         bottom
+
     };
 }
 
 
 /* ============================================================
-   CLEAN WAVEFORM GRAPH
+   INDIVIDUAL WAVEFORM
    ============================================================ */
 
 function drawWave(
@@ -2069,6 +2224,7 @@ function drawWave(
 
     const canvas =
         $(canvasId);
+
 
     if (!canvas) return;
 
@@ -2085,10 +2241,7 @@ function drawWave(
 
 
     /*
-       Show 15 seconds.
-       This is enough to demonstrate
-       the waveform without making it
-       look like a solid block.
+       Display first 15 seconds.
     */
 
     const seconds =
@@ -2107,22 +2260,6 @@ function drawWave(
         );
 
 
-    /*
-       Around 2500 visual points.
-    */
-
-    const maxPoints = 2500;
-
-    const step =
-        Math.max(
-            1,
-            Math.floor(
-                sampleCount /
-                maxPoints
-            )
-        );
-
-
     const axis =
         drawAxes(
             ctx,
@@ -2134,25 +2271,27 @@ function drawWave(
         );
 
 
-    /*
-       Fixed amplitude range gives
-       consistent graphs.
-    */
-
-    const minAmplitude = -1;
-
-    const maxAmplitude = 1;
+    const maxPoints =
+        2500;
 
 
-    /*
-       Waveform.
-    */
+    const step =
+        Math.max(
+            1,
+            Math.floor(
+                sampleCount /
+                maxPoints
+            )
+        );
+
 
     ctx.strokeStyle =
         "#6540c7";
 
+
     ctx.lineWidth =
         1.15;
+
 
     ctx.beginPath();
 
@@ -2185,9 +2324,9 @@ function drawWave(
 
         const value =
             Math.max(
-                minAmplitude,
+                -1,
                 Math.min(
-                    maxAmplitude,
+                    1,
                     data[i]
                 )
             );
@@ -2198,13 +2337,8 @@ function drawWave(
             (
                 1 -
                 (
-                    value -
-                    minAmplitude
-                ) /
-                (
-                    maxAmplitude -
-                    minAmplitude
-                )
+                    value + 1
+                ) / 2
             ) *
             (
                 h -
@@ -2213,7 +2347,9 @@ function drawWave(
             );
 
 
-        if (point === 0) {
+        if (
+            point === 0
+        ) {
 
             ctx.moveTo(
                 x,
@@ -2243,11 +2379,14 @@ function drawWave(
     ctx.fillStyle =
         "#17203a";
 
+
     ctx.font =
         "bold 12px Arial";
 
+
     ctx.textAlign =
         "left";
+
 
     ctx.fillText(
         title,
@@ -2257,14 +2396,16 @@ function drawWave(
 
 
     /*
-       Small time ticks.
+       Time ticks.
     */
 
     ctx.fillStyle =
         "#7b8498";
 
+
     ctx.font =
         "10px Arial";
+
 
     ctx.textAlign =
         "center";
@@ -2298,27 +2439,22 @@ function drawWave(
 
 
         ctx.fillText(
-            `${time.toFixed(1)}`,
+            time.toFixed(1),
             x,
-            h - 26
+            h - 25
         );
     }
 }
 
 
 /* ============================================================
-   SPECTRUM CALCULATION
+   MAGNITUDE SPECTRUM
    ============================================================ */
 
 function magnitudeSpectrum(
     data,
     fs
 ) {
-
-    /*
-       Use first 30 seconds,
-       but limit FFT size.
-    */
 
     const maximumSamples =
         Math.min(
@@ -2334,7 +2470,8 @@ function magnitudeSpectrum(
 
 
     while (
-        (n << 1) <= maximumSamples
+        (n << 1) <=
+        maximumSamples
     ) {
 
         n <<= 1;
@@ -2343,6 +2480,7 @@ function magnitudeSpectrum(
 
     const real =
         new Float64Array(n);
+
 
     const imag =
         new Float64Array(n);
@@ -2426,14 +2564,16 @@ function magnitudeSpectrum(
 
 
     return {
+
         frequency,
         magnitude
+
     };
 }
 
 
 /* ============================================================
-   CLEAN SPECTRUM GRAPH
+   INDIVIDUAL SPECTRUM
    ============================================================ */
 
 function drawSpectrum(
@@ -2446,6 +2586,7 @@ function drawSpectrum(
 
     const canvas =
         $(canvasId);
+
 
     if (!canvas) return;
 
@@ -2479,11 +2620,6 @@ function drawSpectrum(
         );
 
 
-    /*
-       Show 0–8 kHz,
-       exactly like your current project.
-    */
-
     const maxFrequency =
         Math.min(
             8000,
@@ -2492,21 +2628,14 @@ function drawSpectrum(
 
 
     const minDb = -90;
-
     const maxDb = 0;
-
-
-    /*
-       Maximum number of visual
-       points. This is the main
-       anti-blur improvement.
-    */
-
-    const maxPoints = 1800;
 
 
     const totalBins =
         spectrum.frequency.length;
+
+
+    const maxPoints = 1800;
 
 
     const step =
@@ -2522,8 +2651,10 @@ function drawSpectrum(
     ctx.strokeStyle =
         "#0798ad";
 
+
     ctx.lineWidth =
         1.2;
+
 
     ctx.beginPath();
 
@@ -2545,6 +2676,7 @@ function drawSpectrum(
             frequency >
             maxFrequency
         ) {
+
             break;
         }
 
@@ -2615,7 +2747,7 @@ function drawSpectrum(
 
 
     /*
-       Cutoff line.
+       Cutoff.
     */
 
     if (
@@ -2639,8 +2771,9 @@ function drawSpectrum(
         ctx.strokeStyle =
             "#e17b20";
 
-        ctx.lineWidth =
-            1.4;
+
+        ctx.lineWidth = 1.4;
+
 
         ctx.setLineDash(
             [6, 5]
@@ -2649,16 +2782,19 @@ function drawSpectrum(
 
         ctx.beginPath();
 
+
         ctx.moveTo(
             cutoffX,
             axis.top
         );
+
 
         ctx.lineTo(
             cutoffX,
             h -
             axis.bottom
         );
+
 
         ctx.stroke();
 
@@ -2669,8 +2805,10 @@ function drawSpectrum(
         ctx.fillStyle =
             "#c46a16";
 
+
         ctx.font =
             "11px Arial";
+
 
         ctx.textAlign =
             "left";
@@ -2678,10 +2816,7 @@ function drawSpectrum(
 
         ctx.fillText(
             `Cutoff ${cutoff} Hz`,
-            Math.min(
-                cutoffX + 7,
-                w - 110
-            ),
+            cutoffX + 7,
             axis.top + 16
         );
     }
@@ -2694,8 +2829,10 @@ function drawSpectrum(
     ctx.fillStyle =
         "#17203a";
 
+
     ctx.font =
         "bold 12px Arial";
+
 
     ctx.textAlign =
         "left";
@@ -2715,25 +2852,34 @@ function drawSpectrum(
     ctx.fillStyle =
         "#7b8498";
 
+
     ctx.font =
         "10px Arial";
+
 
     ctx.textAlign =
         "center";
 
 
-    const frequencyTicks =
-        [0, 2000, 4000, 6000, 8000];
+    const frequencies = [
+        0,
+        2000,
+        4000,
+        6000,
+        8000
+    ];
 
 
     for (
-        const frequency of frequencyTicks
+        const frequency
+        of frequencies
     ) {
 
         if (
             frequency >
             maxFrequency
         ) {
+
             continue;
         }
 
@@ -2754,7 +2900,7 @@ function drawSpectrum(
         ctx.fillText(
             `${frequency}`,
             x,
-            h - 26
+            h - 25
         );
     }
 }
@@ -2773,6 +2919,7 @@ function drawOverallWave(
     const canvas =
         $(canvasId);
 
+
     if (!canvas) return;
 
 
@@ -2787,9 +2934,28 @@ function drawOverallWave(
     } = graph;
 
 
+    const names = [
+
+        "Mixed Input",
+        "FFT Speech",
+        "FIR Speech",
+        "IIR Speech"
+
+    ];
+
+
+    const colors = [
+
+        "#17203a",
+        "#6540c7",
+        "#0798ad",
+        "#d27618"
+
+    ];
+
+
     /*
-       12 seconds gives a clean
-       side-by-side comparison.
+       12 seconds.
     */
 
     const seconds =
@@ -2805,101 +2971,48 @@ function drawOverallWave(
         );
 
 
-    const axis =
-        drawAxes(
-            ctx,
-            w,
-            h,
-            "Time (s)",
-            "Amplitude",
-            58
-        );
+    /*
+       Layout.
+    */
+
+    const topMargin = 45;
+    const bottomMargin = 38;
+    const gap = 14;
 
 
-    const colors = [
-        "#17203a",
-        "#6540c7",
-        "#0798ad",
-        "#d27618"
-    ];
-
-
-    const labels = [
-        "Mixed Input",
-        "FFT Speech",
-        "FIR Speech",
-        "IIR Speech"
-    ];
+    const panelHeight =
+        (
+            h -
+            topMargin -
+            bottomMargin -
+            gap * 3
+        ) / 4;
 
 
     /*
-       Draw clean legend ABOVE the graph.
+       Main title.
     */
 
-    let legendX =
-        axis.left;
-
-
-    const legendY = 31;
+    ctx.fillStyle =
+        "#17203a";
 
 
     ctx.font =
-        "bold 11px Arial";
+        "bold 14px Arial";
+
 
     ctx.textAlign =
         "left";
 
 
-    for (
-        let i = 0;
-        i < Math.min(
-            series.length,
-            labels.length
-        );
-        i++
-    ) {
-
-        ctx.strokeStyle =
-            colors[i];
-
-        ctx.lineWidth = 3;
+    ctx.fillText(
+        "Overall Waveform Comparison",
+        20,
+        23
+    );
 
 
-        ctx.beginPath();
-
-        ctx.moveTo(
-            legendX,
-            legendY
-        );
-
-        ctx.lineTo(
-            legendX + 18,
-            legendY
-        );
-
-        ctx.stroke();
-
-
-        ctx.fillStyle =
-            colors[i];
-
-
-        ctx.fillText(
-            labels[i],
-            legendX + 24,
-            legendY + 4
-        );
-
-
-        legendX += 135;
-    }
-
-
-    /*
-       Draw each waveform.
-    */
-
-    const maxPoints = 1800;
+    const maxPoints = 1600;
 
 
     const step =
@@ -2912,39 +3025,154 @@ function drawOverallWave(
         );
 
 
+    /*
+       Four independent panels.
+    */
+
     for (
         let s = 0;
-        s < Math.min(
-            series.length,
-            colors.length
-        );
+        s < 4;
         s++
     ) {
 
-        const data =
-            series[s].data;
+        const panelTop =
+            topMargin +
+            s *
+            (
+                panelHeight +
+                gap
+            );
 
+
+        const left = 70;
+        const right = 25;
+
+
+        const graphTop =
+            panelTop + 20;
+
+
+        const graphBottom =
+            panelTop +
+            panelHeight -
+            12;
+
+
+        /*
+           Panel.
+        */
+
+        ctx.fillStyle =
+            "#fbfcff";
+
+
+        ctx.fillRect(
+            left,
+            panelTop,
+            w -
+            left -
+            right,
+            panelHeight
+        );
+
+
+        ctx.strokeStyle =
+            "#e1e5ee";
+
+
+        ctx.lineWidth = 1;
+
+
+        ctx.strokeRect(
+            left,
+            panelTop,
+            w -
+            left -
+            right,
+            panelHeight
+        );
+
+
+        /*
+           Panel title.
+        */
+
+        ctx.fillStyle =
+            colors[s];
+
+
+        ctx.font =
+            "bold 12px Arial";
+
+
+        ctx.textAlign =
+            "left";
+
+
+        ctx.fillText(
+            names[s],
+            left + 10,
+            panelTop + 15
+        );
+
+
+        /*
+           Zero line.
+        */
+
+        const zeroY =
+            graphTop +
+            (
+                graphBottom -
+                graphTop
+            ) / 2;
+
+
+        ctx.strokeStyle =
+            "#e7eaf0";
+
+
+        ctx.lineWidth = 1;
+
+
+        ctx.beginPath();
+
+
+        ctx.moveTo(
+            left,
+            zeroY
+        );
+
+
+        ctx.lineTo(
+            w - right,
+            zeroY
+        );
+
+
+        ctx.stroke();
+
+
+        /*
+           Waveform.
+        */
 
         ctx.strokeStyle =
             colors[s];
 
 
         ctx.lineWidth =
-            s === 0
-                ? 1.25
-                : 1.05;
+            1.15;
 
 
         ctx.globalAlpha =
-            s === 0
-                ? 0.65
-                : 0.78;
+            0.9;
 
 
         ctx.beginPath();
 
 
-        let point = 0;
+        let firstPoint = true;
 
 
         for (
@@ -2958,15 +3186,15 @@ function drawOverallWave(
 
 
             const x =
-                axis.left +
+                left +
                 (
                     time /
                     seconds
                 ) *
                 (
                     w -
-                    axis.left -
-                    axis.right
+                    left -
+                    right
                 );
 
 
@@ -2975,13 +3203,13 @@ function drawOverallWave(
                     -1,
                     Math.min(
                         1,
-                        data[i]
+                        series[s].data[i]
                     )
                 );
 
 
             const y =
-                axis.top +
+                graphTop +
                 (
                     1 -
                     (
@@ -2989,20 +3217,23 @@ function drawOverallWave(
                     ) / 2
                 ) *
                 (
-                    h -
-                    axis.top -
-                    axis.bottom
+                    graphBottom -
+                    graphTop
                 );
 
 
             if (
-                point === 0
+                firstPoint
             ) {
 
                 ctx.moveTo(
                     x,
                     y
                 );
+
+
+                firstPoint =
+                    false;
 
             } else {
 
@@ -3011,43 +3242,128 @@ function drawOverallWave(
                     y
                 );
             }
-
-
-            point++;
         }
 
 
         ctx.stroke();
+
+
+        ctx.globalAlpha = 1;
+
+
+        /*
+           Amplitude label.
+        */
+
+        if (s === 0) {
+
+            ctx.fillStyle =
+                "#68718b";
+
+
+            ctx.font =
+                "10px Arial";
+
+
+            ctx.save();
+
+
+            ctx.translate(
+                22,
+                panelTop +
+                panelHeight / 2
+            );
+
+
+            ctx.rotate(
+                -Math.PI / 2
+            );
+
+
+            ctx.textAlign =
+                "center";
+
+
+            ctx.fillText(
+                "Amplitude",
+                0,
+                0
+            );
+
+
+            ctx.restore();
+        }
+
+
+        /*
+           Time axis only on final panel.
+        */
+
+        if (s === 3) {
+
+            ctx.fillStyle =
+                "#68718b";
+
+
+            ctx.font =
+                "10px Arial";
+
+
+            ctx.textAlign =
+                "center";
+
+
+            const ticks = 6;
+
+
+            for (
+                let i = 0;
+                i <= ticks;
+                i++
+            ) {
+
+                const time =
+                    seconds *
+                    i /
+                    ticks;
+
+
+                const x =
+                    left +
+                    (
+                        i / ticks
+                    ) *
+                    (
+                        w -
+                        left -
+                        right
+                    );
+
+
+                ctx.fillText(
+                    time.toFixed(1),
+                    x,
+                    graphBottom + 18
+                );
+            }
+
+
+            ctx.textAlign =
+                "right";
+
+
+            ctx.fillText(
+                "Time (s)",
+                w - right,
+                graphBottom + 18
+            );
+        }
     }
-
-
-    ctx.globalAlpha = 1;
-
-
-    /*
-       Title.
-    */
-
-    ctx.fillStyle =
-        "#17203a";
-
-    ctx.font =
-        "bold 13px Arial";
-
-    ctx.textAlign =
-        "left";
-
-
-    ctx.fillText(
-        "Overall Waveform Comparison",
-        axis.left,
-        17
-    );
 }
 
 
 /* ============================================================
-   OVERALL FFT SPECTRUM
+   OVERALL FFT SPECTRUM COMPARISON
    ============================================================ */
 
 function drawOverallSpec(
@@ -3058,6 +3374,7 @@ function drawOverallSpec(
 
     const canvas =
         $(canvasId);
+
 
     if (!canvas) return;
 
@@ -3073,15 +3390,38 @@ function drawOverallSpec(
     } = graph;
 
 
-    const axis =
-        drawAxes(
-            ctx,
-            w,
-            h,
-            "Frequency (Hz)",
-            "Magnitude (dB)",
-            58
-        );
+    const names = [
+
+        "Mixed Input",
+        "FFT Speech",
+        "FIR Speech",
+        "IIR Speech"
+
+    ];
+
+
+    const colors = [
+
+        "#17203a",
+        "#6540c7",
+        "#0798ad",
+        "#d27618"
+
+    ];
+
+
+    const topMargin = 45;
+    const bottomMargin = 38;
+    const gap = 14;
+
+
+    const panelHeight =
+        (
+            h -
+            topMargin -
+            bottomMargin -
+            gap * 3
+        ) / 4;
 
 
     const maxFrequency =
@@ -3091,102 +3431,131 @@ function drawOverallSpec(
         );
 
 
-    const colors = [
-        "#17203a",
-        "#6540c7",
-        "#0798ad",
-        "#d27618"
-    ];
-
-
-    const labels = [
-        "Mixed Input",
-        "FFT Speech",
-        "FIR Speech",
-        "IIR Speech"
-    ];
+    const minDb = -90;
+    const maxDb = 0;
 
 
     /*
-       Legend at top.
+       Main title.
     */
 
-    let legendX =
-        axis.left;
-
-
-    const legendY = 31;
+    ctx.fillStyle =
+        "#17203a";
 
 
     ctx.font =
-        "bold 11px Arial";
+        "bold 14px Arial";
+
 
     ctx.textAlign =
         "left";
 
 
-    for (
-        let i = 0;
-        i < Math.min(
-            series.length,
-            labels.length
-        );
-        i++
-    ) {
-
-        ctx.strokeStyle =
-            colors[i];
-
-        ctx.lineWidth = 3;
-
-
-        ctx.beginPath();
-
-        ctx.moveTo(
-            legendX,
-            legendY
-        );
-
-        ctx.lineTo(
-            legendX + 18,
-            legendY
-        );
-
-        ctx.stroke();
-
-
-        ctx.fillStyle =
-            colors[i];
-
-
-        ctx.fillText(
-            labels[i],
-            legendX + 24,
-            legendY + 4
-        );
-
-
-        legendX += 135;
-    }
+    ctx.fillText(
+        "Overall FFT Spectrum Comparison",
+        20,
+        23
+    );
 
 
     /*
-       Draw spectra.
+       Four independent spectrum panels.
     */
-
-    const minDb = -90;
-
-    const maxDb = 0;
-
 
     for (
         let s = 0;
-        s < Math.min(
-            series.length,
-            colors.length
-        );
+        s < 4;
         s++
     ) {
+
+        const panelTop =
+            topMargin +
+            s *
+            (
+                panelHeight +
+                gap
+            );
+
+
+        const left = 70;
+        const right = 25;
+
+
+        const graphTop =
+            panelTop + 20;
+
+
+        const graphBottom =
+            panelTop +
+            panelHeight -
+            12;
+
+
+        /*
+           Panel background.
+        */
+
+        ctx.fillStyle =
+            "#fbfcff";
+
+
+        ctx.fillRect(
+            left,
+            panelTop,
+            w -
+            left -
+            right,
+            panelHeight
+        );
+
+
+        /*
+           Panel border.
+        */
+
+        ctx.strokeStyle =
+            "#e1e5ee";
+
+
+        ctx.lineWidth = 1;
+
+
+        ctx.strokeRect(
+            left,
+            panelTop,
+            w -
+            left -
+            right,
+            panelHeight
+        );
+
+
+        /*
+           Panel title.
+        */
+
+        ctx.fillStyle =
+            colors[s];
+
+
+        ctx.font =
+            "bold 12px Arial";
+
+
+        ctx.textAlign =
+            "left";
+
+
+        ctx.fillText(
+            names[s],
+            left + 10,
+            panelTop + 15
+        );
+
+
+        /*
+           Spectrum.
+        */
 
         const spectrum =
             magnitudeSpectrum(
@@ -3199,7 +3568,7 @@ function drawOverallSpec(
             spectrum.frequency.length;
 
 
-        const maxPoints = 1500;
+        const maxPoints = 1400;
 
 
         const step =
@@ -3217,15 +3586,11 @@ function drawOverallSpec(
 
 
         ctx.lineWidth =
-            s === 0
-                ? 1.25
-                : 1.05;
+            1.1;
 
 
         ctx.globalAlpha =
-            s === 0
-                ? 0.55
-                : 0.70;
+            0.9;
 
 
         ctx.beginPath();
@@ -3248,6 +3613,7 @@ function drawOverallSpec(
                 frequency >
                 maxFrequency
             ) {
+
                 break;
             }
 
@@ -3263,20 +3629,20 @@ function drawOverallSpec(
 
 
             const x =
-                axis.left +
+                left +
                 (
                     frequency /
                     maxFrequency
                 ) *
                 (
                     w -
-                    axis.left -
-                    axis.right
+                    left -
+                    right
                 );
 
 
             const y =
-                axis.top +
+                graphTop +
                 (
                     1 -
                     (
@@ -3289,9 +3655,8 @@ function drawOverallSpec(
                     )
                 ) *
                 (
-                    h -
-                    axis.top -
-                    axis.bottom
+                    graphBottom -
+                    graphTop
                 );
 
 
@@ -3301,6 +3666,7 @@ function drawOverallSpec(
                     x,
                     y
                 );
+
 
                 started = true;
 
@@ -3315,87 +3681,281 @@ function drawOverallSpec(
 
 
         ctx.stroke();
-    }
 
 
-    ctx.globalAlpha = 1;
+        ctx.globalAlpha = 1;
 
 
-    /*
-       Title.
-    */
+        /*
+           Frequency grid.
+        */
 
-    ctx.fillStyle =
-        "#17203a";
-
-    ctx.font =
-        "bold 13px Arial";
-
-    ctx.textAlign =
-        "left";
-
-
-    ctx.fillText(
-        "Overall FFT Spectrum Comparison",
-        axis.left,
-        17
-    );
+        const frequencies = [
+            0,
+            2000,
+            4000,
+            6000,
+            8000
+        ];
 
 
-    /*
-       Frequency ticks.
-    */
-
-    ctx.fillStyle =
-        "#7b8498";
-
-    ctx.font =
-        "10px Arial";
-
-    ctx.textAlign =
-        "center";
+        ctx.strokeStyle =
+            "#edf0f5";
 
 
-    const ticks =
-        [0, 2000, 4000, 6000, 8000];
+        ctx.lineWidth = 1;
 
 
-    for (
-        const frequency of ticks
-    ) {
-
-        if (
-            frequency >
-            maxFrequency
+        for (
+            const frequency
+            of frequencies
         ) {
-            continue;
-        }
 
-
-        const x =
-            axis.left +
-            (
-                frequency /
+            if (
+                frequency >
                 maxFrequency
-            ) *
-            (
-                w -
-                axis.left -
-                axis.right
+            ) {
+
+                continue;
+            }
+
+
+            const x =
+                left +
+                (
+                    frequency /
+                    maxFrequency
+                ) *
+                (
+                    w -
+                    left -
+                    right
+                );
+
+
+            ctx.beginPath();
+
+
+            ctx.moveTo(
+                x,
+                graphTop
             );
 
 
-        ctx.fillText(
-            `${frequency}`,
-            x,
-            h - 26
-        );
+            ctx.lineTo(
+                x,
+                graphBottom
+            );
+
+
+            ctx.stroke();
+        }
+
+
+        /*
+           Cutoff line.
+        */
+
+        const cutoff =
+            Number(
+                $("cutoff")?.value ||
+                1200
+            );
+
+
+        if (
+            cutoff > 0 &&
+            cutoff < maxFrequency
+        ) {
+
+            const cutoffX =
+                left +
+                (
+                    cutoff /
+                    maxFrequency
+                ) *
+                (
+                    w -
+                    left -
+                    right
+                );
+
+
+            ctx.strokeStyle =
+                "#e17b20";
+
+
+            ctx.lineWidth = 1;
+
+
+            ctx.setLineDash(
+                [5, 5]
+            );
+
+
+            ctx.beginPath();
+
+
+            ctx.moveTo(
+                cutoffX,
+                graphTop
+            );
+
+
+            ctx.lineTo(
+                cutoffX,
+                graphBottom
+            );
+
+
+            ctx.stroke();
+
+
+            ctx.setLineDash([]);
+
+
+            /*
+               Show cutoff text only
+               on first graph.
+            */
+
+            if (s === 0) {
+
+                ctx.fillStyle =
+                    "#c46a16";
+
+
+                ctx.font =
+                    "10px Arial";
+
+
+                ctx.textAlign =
+                    "left";
+
+
+                ctx.fillText(
+                    `Cutoff ${cutoff} Hz`,
+                    cutoffX + 5,
+                    graphTop + 12
+                );
+            }
+        }
+
+
+        /*
+           Magnitude label.
+        */
+
+        if (s === 0) {
+
+            ctx.fillStyle =
+                "#68718b";
+
+
+            ctx.font =
+                "10px Arial";
+
+
+            ctx.save();
+
+
+            ctx.translate(
+                22,
+                panelTop +
+                panelHeight / 2
+            );
+
+
+            ctx.rotate(
+                -Math.PI / 2
+            );
+
+
+            ctx.textAlign =
+                "center";
+
+
+            ctx.fillText(
+                "Magnitude (dB)",
+                0,
+                0
+            );
+
+
+            ctx.restore();
+        }
+
+
+        /*
+           Frequency axis only
+           on bottom panel.
+        */
+
+        if (s === 3) {
+
+            ctx.fillStyle =
+                "#68718b";
+
+
+            ctx.font =
+                "10px Arial";
+
+
+            ctx.textAlign =
+                "center";
+
+
+            for (
+                const frequency
+                of frequencies
+            ) {
+
+                if (
+                    frequency >
+                    maxFrequency
+                ) {
+
+                    continue;
+                }
+
+
+                const x =
+                    left +
+                    (
+                        frequency /
+                        maxFrequency
+                    ) *
+                    (
+                        w -
+                        left -
+                        right
+                    );
+
+
+                ctx.fillText(
+                    `${frequency}`,
+                    x,
+                    graphBottom + 18
+                );
+            }
+
+
+            ctx.textAlign =
+                "right";
+
+
+            ctx.fillText(
+                "Frequency (Hz)",
+                w - right,
+                graphBottom + 18
+            );
+        }
     }
 }
 
 
 /* ============================================================
-   MAIN PROCESS
+   MAIN DSP PROCESS
    ============================================================ */
 
 async function processProject() {
@@ -3427,7 +3987,7 @@ async function processProject() {
 
 
     /*
-       Clean old object URLs.
+       Delete old audio URLs.
     */
 
     objectUrls.forEach(
@@ -3441,9 +4001,9 @@ async function processProject() {
 
     try {
 
-        /* ----------------------------------------------------
-           MIXED INPUT
-           ---------------------------------------------------- */
+        /* ====================================================
+           LOAD MIXED AUDIO
+           ==================================================== */
 
         setStatus(
             "Loading mixed audio...",
@@ -3460,13 +4020,14 @@ async function processProject() {
         const mix =
             mixAudio.samples;
 
+
         const fs =
             mixAudio.fs;
 
 
-        /* ----------------------------------------------------
+        /* ====================================================
            PARAMETERS
-           ---------------------------------------------------- */
+           ==================================================== */
 
         const cutoff =
             Number(
@@ -3499,12 +4060,12 @@ async function processProject() {
         }
 
 
-        /* ----------------------------------------------------
+        /* ====================================================
            FFT
-           ---------------------------------------------------- */
+           ==================================================== */
 
         setStatus(
-            "Running FFT frequency-domain separation...",
+            "Running FFT separation...",
             5
         );
 
@@ -3524,9 +4085,9 @@ async function processProject() {
             );
 
 
-        /* ----------------------------------------------------
+        /* ====================================================
            FIR
-           ---------------------------------------------------- */
+           ==================================================== */
 
         setStatus(
             "Designing FIR filters...",
@@ -3576,9 +4137,9 @@ async function processProject() {
             );
 
 
-        /* ----------------------------------------------------
+        /* ====================================================
            IIR
-           ---------------------------------------------------- */
+           ==================================================== */
 
         setStatus(
             "Applying IIR Butterworth filters...",
@@ -3610,18 +4171,19 @@ async function processProject() {
             );
 
 
-        /* ----------------------------------------------------
-           REFERENCE FILES
-           ---------------------------------------------------- */
+        /* ====================================================
+           OPTIONAL REFERENCES
+           ==================================================== */
 
         setStatus(
-            "Loading optional reference signals...",
+            "Loading optional reference files...",
             86
         );
 
 
         let speechReference =
             null;
+
 
         let musicReference =
             null;
@@ -3689,12 +4251,12 @@ async function processProject() {
         }
 
 
-        /* ----------------------------------------------------
+        /* ====================================================
            AUDIO OUTPUTS
-           ---------------------------------------------------- */
+           ==================================================== */
 
         setStatus(
-            "Creating audio outputs...",
+            "Creating separated audio files...",
             90
         );
 
@@ -3753,9 +4315,9 @@ async function processProject() {
         );
 
 
-        /* ----------------------------------------------------
+        /* ====================================================
            INDIVIDUAL WAVEFORMS
-           ---------------------------------------------------- */
+           ==================================================== */
 
         setStatus(
             "Drawing time-domain waveforms...",
@@ -3819,9 +4381,9 @@ async function processProject() {
         );
 
 
-        /* ----------------------------------------------------
+        /* ====================================================
            INDIVIDUAL SPECTRA
-           ---------------------------------------------------- */
+           ==================================================== */
 
         setStatus(
             "Drawing frequency spectra...",
@@ -3892,9 +4454,9 @@ async function processProject() {
         );
 
 
-        /* ----------------------------------------------------
-           OVERALL COMPARISONS
-           ---------------------------------------------------- */
+        /* ====================================================
+           OVERALL WAVEFORM
+           ==================================================== */
 
         drawOverallWave(
             "overallWave",
@@ -3903,18 +4465,25 @@ async function processProject() {
                     data: mix
                 },
                 {
-                    data: fftOutput.speech
+                    data:
+                        fftOutput.speech
                 },
                 {
-                    data: firSpeech
+                    data:
+                        firSpeech
                 },
                 {
-                    data: iirSpeech
+                    data:
+                        iirSpeech
                 }
             ],
             fs
         );
 
+
+        /* ====================================================
+           OVERALL SPECTRUM
+           ==================================================== */
 
         drawOverallSpec(
             "overallSpec",
@@ -3923,22 +4492,25 @@ async function processProject() {
                     data: mix
                 },
                 {
-                    data: fftOutput.speech
+                    data:
+                        fftOutput.speech
                 },
                 {
-                    data: firSpeech
+                    data:
+                        firSpeech
                 },
                 {
-                    data: iirSpeech
+                    data:
+                        iirSpeech
                 }
             ],
             fs
         );
 
 
-        /* ----------------------------------------------------
+        /* ====================================================
            PERFORMANCE TABLE
-           ---------------------------------------------------- */
+           ==================================================== */
 
         if (
             $("metricsTable")
@@ -3984,13 +4556,14 @@ async function processProject() {
         }
 
 
-        /* ----------------------------------------------------
-           SAVE RESULT
-           ---------------------------------------------------- */
+        /* ====================================================
+           STORE RESULTS
+           ==================================================== */
 
         lastResult = {
 
             fs,
+
             mix,
 
             fftSpeech:
@@ -4000,18 +4573,20 @@ async function processProject() {
                 fftOutput.music,
 
             firSpeech,
+
             firMusic,
 
             iirSpeech,
+
             iirMusic,
 
             cutoff
         };
 
 
-        /* ----------------------------------------------------
+        /* ====================================================
            SHOW RESULTS
-           ---------------------------------------------------- */
+           ==================================================== */
 
         if ($("results")) {
 
@@ -4027,21 +4602,21 @@ async function processProject() {
         );
 
 
-        /*
-           Scroll to results.
-        */
+        setTimeout(
+            () => {
 
-        setTimeout(() => {
+                if ($("results")) {
 
-            if ($("results")) {
+                    $("results")
+                        .scrollIntoView({
+                            behavior: "smooth",
+                            block: "start"
+                        });
+                }
 
-                $("results").scrollIntoView({
-                    behavior: "smooth",
-                    block: "start"
-                });
-            }
-
-        }, 150);
+            },
+            150
+        );
 
 
     } catch (error) {
@@ -4059,6 +4634,7 @@ async function processProject() {
                 "Unable to process audio."
             )
         );
+
 
     } finally {
 
@@ -4246,7 +4822,7 @@ window.addEventListener(
                     );
 
 
-                    /* Overall */
+                    /* Overall waveform */
 
                     drawOverallWave(
                         "overallWave",
@@ -4267,6 +4843,8 @@ window.addEventListener(
                         fs
                     );
 
+
+                    /* Overall spectrum */
 
                     drawOverallSpec(
                         "overallSpec",

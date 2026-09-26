@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DSP Audio Separation Studio</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-bg"></div>
+
+  <main class="container">
+    <section class="hero card">
+      <div>
+        <div class="eyebrow">DIGITAL SIGNAL PROCESSING • AUDIO ANALYSIS</div>
+        <h1>DSP Audio Separation Studio</h1>
+        <p>Speech &amp; Music Separation using FFT, FIR and IIR Filters</p>
+      </div>
+      <div class="hero-badge">FFT • FIR • IIR</div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">
+        <span class="number">01</span>
+        <div>
+          <h2>Audio Input</h2>
+          <p>Upload the mixed WAV signal containing speech and music.</p>
+        </div>
+      </div>
+
+      <div class="upload-grid">
+        <label class="upload-box primary-upload">
+          <span class="upload-icon">🎧</span>
+          <strong>Mixed Input WAV</strong>
+          <span id="mixName">Choose a WAV file</span>
+          <input id="mixFile" type="file" accept=".wav,audio/wav">
+        </label>
+
+        <label class="upload-box optional-upload">
+          <span class="upload-icon">🎙️</span>
+          <strong>Speech Reference <small>(optional)</small></strong>
+          <span id="speechName">Used only for evaluation metrics</span>
+          <input id="speechFile" type="file" accept=".wav,audio/wav">
+        </label>
+
+        <label class="upload-box optional-upload">
+          <span class="upload-icon">🎵</span>
+          <strong>Music Reference <small>(optional)</small></strong>
+          <span id="musicName">Used only for evaluation metrics</span>
+          <input id="musicFile" type="file" accept=".wav,audio/wav">
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-title">
+        <span class="number">02</span>
+        <div>
+          <h2>DSP Parameters</h2>
+          <p>Change the filter parameters before starting separation.</p>
+        </div>
+      </div>
+
+      <div class="parameter-grid">
+        <label>
+          <span>Cutoff Frequency (Hz)</span>
+          <input id="cutoff" type="number" value="1200" min="50" max="20000" step="50">
+        </label>
+        <label>
+          <span>FIR Number of Taps</span>
+          <input id="firTaps" type="number" value="101" min="5" max="501" step="2">
+        </label>
+        <label>
+          <span>IIR Butterworth Order</span>
+          <input id="iirOrder" type="number" value="6" min="2" max="8" step="2">
+        </label>
+      </div>
+
+      <button id="startBtn" class="start-btn">
+        <span>▶</span> START AUDIO SEPARATION
+      </button>
+
+      <div id="status" class="status">Waiting for a mixed WAV file...</div>
+      <div id="progressWrap" class="progress-wrap hidden">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+    </section>
+
+    <section id="results" class="hidden">
+      <div class="section-heading">Separated Audio Outputs</div>
+
+      <div class="output-grid">
+        <div class="output-card card">
+          <div class="method-title fft-title">FFT Separation</div>
+          <p>Frequency-domain binary masking</p>
+          <audio id="fftSpeechAudio" controls></audio>
+          <a id="fftSpeechDownload" class="download" download="FFT_Speech.wav">Download Speech</a>
+          <audio id="fftMusicAudio" controls></audio>
+          <a id="fftMusicDownload" class="download" download="FFT_Music.wav">Download Music</a>
+        </div>
+
+        <div class="output-card card">
+          <div class="method-title fir-title">FIR Separation</div>
+          <p>Windowed-sinc Hamming FIR filters</p>
+          <audio id="firSpeechAudio" controls></audio>
+          <a id="firSpeechDownload" class="download" download="FIR_Speech.wav">Download Speech</a>
+          <audio id="firMusicAudio" controls></audio>
+          <a id="firMusicDownload" class="download" download="FIR_Music.wav">Download Music</a>
+        </div>
+
+        <div class="output-card card">
+          <div class="method-title iir-title">IIR Separation</div>
+          <p>Butterworth low-pass / high-pass cascade</p>
+          <audio id="iirSpeechAudio" controls></audio>
+          <a id="iirSpeechDownload" class="download" download="IIR_Speech.wav">Download Speech</a>
+          <audio id="iirMusicAudio" controls></audio>
+          <a id="iirMusicDownload" class="download" download="IIR_Music.wav">Download Music</a>
+        </div>
+      </div>
+
+      <div class="section-heading">Individual Time-Domain Waveforms</div>
+      <div class="graph-grid">
+        <div class="graph-card card"><h3>Mixed Input</h3><canvas id="waveMix"></canvas></div>
+        <div class="graph-card card"><h3>FFT Speech</h3><canvas id="waveFftSpeech"></canvas></div>
+        <div class="graph-card card"><h3>FFT Music</h3><canvas id="waveFftMusic"></canvas></div>
+        <div class="graph-card card"><h3>FIR Speech</h3><canvas id="waveFirSpeech"></canvas></div>
+        <div class="graph-card card"><h3>FIR Music</h3><canvas id="waveFirMusic"></canvas></div>
+        <div class="graph-card card"><h3>IIR Speech</h3><canvas id="waveIirSpeech"></canvas></div>
+        <div class="graph-card card"><h3>IIR Music</h3><canvas id="waveIirMusic"></canvas></div>
+      </div>
+
+      <div class="section-heading">Individual Frequency Spectra</div>
+      <div class="graph-grid">
+        <div class="graph-card card"><h3>Mixed Input Spectrum</h3><canvas id="specMix"></canvas></div>
+        <div class="graph-card card"><h3>FFT Speech Spectrum</h3><canvas id="specFftSpeech"></canvas></div>
+        <div class="graph-card card"><h3>FFT Music Spectrum</h3><canvas id="specFftMusic"></canvas></div>
+        <div class="graph-card card"><h3>FIR Speech Spectrum</h3><canvas id="specFirSpeech"></canvas></div>
+        <div class="graph-card card"><h3>FIR Music Spectrum</h3><canvas id="specFirMusic"></canvas></div>
+        <div class="graph-card card"><h3>IIR Speech Spectrum</h3><canvas id="specIirSpeech"></canvas></div>
+        <div class="graph-card card"><h3>IIR Music Spectrum</h3><canvas id="specIirMusic"></canvas></div>
+      </div>
+
+      <div class="section-heading">Overall Analysis &amp; Comparison</div>
+      <div class="graph-grid overall-grid">
+        <div class="graph-card card"><h3>Overall Waveform Comparison</h3><canvas id="overallWave"></canvas></div>
+        <div class="graph-card card"><h3>Overall FFT Spectrum Comparison</h3><canvas id="overallSpec"></canvas></div>
+      </div>
+
+      <div class="section-heading">Performance Evaluation</div>
+      <div class="card table-card">
+        <p class="table-note">Reference WAV files are optional. If they are not supplied, separation still works, but reference-based Correlation, SNR and RMSE are shown as N/A.</p>
+        <div class="table-wrap">
+          <table id="metricsTable">
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Speech Correlation</th>
+                <th>Music Correlation</th>
+                <th>Speech SNR (dB)</th>
+                <th>Music SNR (dB)</th>
+                <th>Speech RMSE</th>
+                <th>Music RMSE</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      Direct client-side DSP • No Python server • GitHub Pages compatible
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

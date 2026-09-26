@@ -1,47 +1,69 @@
 /* ============================================================
    DSP AUDIO SEPARATION STUDIO
-   Client-Side JavaScript Version
+   Pure JavaScript / GitHub Pages
    FFT + FIR + IIR
-   GitHub Pages Compatible
    ============================================================ */
 
-const $ = (id) => document.getElementById(id);
+const $ = id => document.getElementById(id);
 
-let currentObjectUrls = [];
+let objectUrls = [];
 let lastResult = null;
 
 
 /* ============================================================
-   BASIC UI FUNCTIONS
+   STATUS
    ============================================================ */
 
 function setStatus(message, progress = null) {
-    $("status").textContent = message;
+    const status = $("status");
+
+    if (status) {
+        status.textContent = message;
+    }
 
     if (progress !== null) {
-        $("progressWrap").classList.remove("hidden");
-        $("progressBar").style.width =
-            `${Math.max(0, Math.min(100, progress))}%`;
+        const wrap = $("progressWrap");
+        const bar = $("progressBar");
+
+        if (wrap) wrap.classList.remove("hidden");
+        if (bar) {
+            bar.style.width =
+                `${Math.max(0, Math.min(100, progress))}%`;
+        }
     }
 }
 
 
-function setFileName(inputId, labelId) {
+/* ============================================================
+   FILE NAMES
+   ============================================================ */
 
-    $(inputId).addEventListener("change", () => {
+function setupFileName(inputId, labelId) {
 
-        const file = $(inputId).files[0];
+    const input = $(inputId);
 
-        $(labelId).textContent =
-            file ? file.name : "Choose a WAV file";
+    if (!input) return;
+
+    input.addEventListener("change", () => {
+
+        const file = input.files[0];
+
+        if ($(labelId)) {
+            $(labelId).textContent =
+                file ? file.name : "Choose a WAV file";
+        }
     });
 }
 
 
-setFileName("mixFile", "mixName");
-setFileName("speechFile", "speechName");
-setFileName("musicFile", "musicName");
+setupFileName("mixFile", "mixName");
+setupFileName("speechFile", "speechName");
+setupFileName("musicFile", "musicName");
 
+
+/* ============================================================
+   UTILITY
+   ============================================================ */
 
 function nextOdd(n) {
 
@@ -51,25 +73,25 @@ function nextOdd(n) {
 }
 
 
-/* ============================================================
-   AUDIO NORMALIZATION
-   ============================================================ */
-
 function normalize(x, peak = 0.95) {
 
-    let max = 0;
+    let maximum = 0;
 
     for (let i = 0; i < x.length; i++) {
-        max = Math.max(max, Math.abs(x[i]));
+        maximum = Math.max(
+            maximum,
+            Math.abs(x[i])
+        );
     }
 
-    if (max === 0) {
+    if (maximum < 1e-12) {
         return x.slice();
     }
 
-    const scale = peak / max;
+    const scale = peak / maximum;
 
-    const out = new Float32Array(x.length);
+    const out =
+        new Float32Array(x.length);
 
     for (let i = 0; i < x.length; i++) {
         out[i] = x[i] * scale;
@@ -80,26 +102,32 @@ function normalize(x, peak = 0.95) {
 
 
 /* ============================================================
-   AUDIO DECODING
+   AUDIO LOADING
    ============================================================ */
 
 function downmix(buffer) {
 
-    const channels = buffer.numberOfChannels;
-    const n = buffer.length;
+    const channels =
+        buffer.numberOfChannels;
 
-    const out = new Float32Array(n);
+    const n =
+        buffer.length;
+
+    const output =
+        new Float32Array(n);
 
     for (let c = 0; c < channels; c++) {
 
-        const channel = buffer.getChannelData(c);
+        const channel =
+            buffer.getChannelData(c);
 
         for (let i = 0; i < n; i++) {
-            out[i] += channel[i] / channels;
+            output[i] +=
+                channel[i] / channels;
         }
     }
 
-    return out;
+    return output;
 }
 
 
@@ -109,18 +137,24 @@ async function decodeFile(file) {
         window.AudioContext ||
         window.webkitAudioContext;
 
-    const ctx = new AudioContextClass();
+    const context =
+        new AudioContextClass();
 
-    const data = await file.arrayBuffer();
+    const buffer =
+        await file.arrayBuffer();
 
     const decoded =
-        await ctx.decodeAudioData(data.slice(0));
+        await context.decodeAudioData(
+            buffer.slice(0)
+        );
 
-    const samples = downmix(decoded);
+    const samples =
+        downmix(decoded);
 
-    const fs = decoded.sampleRate;
+    const fs =
+        decoded.sampleRate;
 
-    await ctx.close();
+    await context.close();
 
     return {
         samples: normalize(samples),
@@ -136,18 +170,29 @@ async function decodeFile(file) {
 function encodeWav(samples, sampleRate) {
 
     const buffer =
-        new ArrayBuffer(44 + samples.length * 2);
+        new ArrayBuffer(
+            44 +
+            samples.length * 2
+        );
 
-    const view = new DataView(buffer);
+    const view =
+        new DataView(buffer);
 
 
-    function writeString(offset, text) {
+    function writeString(
+        offset,
+        string
+    ) {
 
-        for (let i = 0; i < text.length; i++) {
+        for (
+            let i = 0;
+            i < string.length;
+            i++
+        ) {
 
             view.setUint8(
                 offset + i,
-                text.charCodeAt(i)
+                string.charCodeAt(i)
             );
         }
     }
@@ -165,11 +210,23 @@ function encodeWav(samples, sampleRate) {
 
     writeString(12, "fmt ");
 
-    view.setUint32(16, 16, true);
+    view.setUint32(
+        16,
+        16,
+        true
+    );
 
-    view.setUint16(20, 1, true);
+    view.setUint16(
+        20,
+        1,
+        true
+    );
 
-    view.setUint16(22, 1, true);
+    view.setUint16(
+        22,
+        1,
+        true
+    );
 
     view.setUint32(
         24,
@@ -183,9 +240,17 @@ function encodeWav(samples, sampleRate) {
         true
     );
 
-    view.setUint16(32, 2, true);
+    view.setUint16(
+        32,
+        2,
+        true
+    );
 
-    view.setUint16(34, 16, true);
+    view.setUint16(
+        34,
+        16,
+        true
+    );
 
     writeString(36, "data");
 
@@ -199,19 +264,27 @@ function encodeWav(samples, sampleRate) {
     let offset = 44;
 
 
-    for (let i = 0; i < samples.length; i++) {
+    for (
+        let i = 0;
+        i < samples.length;
+        i++
+    ) {
 
-        const s =
+        const sample =
             Math.max(
                 -1,
-                Math.min(1, samples[i])
+                Math.min(
+                    1,
+                    samples[i]
+                )
             );
+
 
         view.setInt16(
             offset,
-            s < 0
-                ? s * 32768
-                : s * 32767,
+            sample < 0
+                ? sample * 32768
+                : sample * 32767,
             true
         );
 
@@ -221,13 +294,15 @@ function encodeWav(samples, sampleRate) {
 
     return new Blob(
         [buffer],
-        { type: "audio/wav" }
+        {
+            type: "audio/wav"
+        }
     );
 }
 
 
 /* ============================================================
-   AUDIO PLAYER + DOWNLOAD
+   AUDIO OUTPUT
    ============================================================ */
 
 function attachAudio(
@@ -239,23 +314,33 @@ function attachAudio(
 ) {
 
     const blob =
-        encodeWav(samples, fs);
+        encodeWav(
+            samples,
+            fs
+        );
 
     const url =
         URL.createObjectURL(blob);
 
-    currentObjectUrls.push(url);
+    objectUrls.push(url);
 
-    $(audioId).src = url;
+    if ($(audioId)) {
+        $(audioId).src = url;
+    }
 
-    $(downloadId).href = url;
+    if ($(downloadId)) {
 
-    $(downloadId).download = filename;
+        $(downloadId).href = url;
+
+        $(downloadId).download =
+            filename;
+    }
 }
 
 
 /* ============================================================
-   FIR FILTER DESIGN
+   FIR LOW-PASS
+   Hamming Window
    ============================================================ */
 
 function designFIRLowpass(
@@ -269,43 +354,53 @@ function designFIRLowpass(
     const h =
         new Float32Array(taps);
 
-    const M =
+    const center =
         (taps - 1) / 2;
 
     const fc =
         cutoff / fs;
 
 
-    for (let n = 0; n < taps; n++) {
+    for (
+        let n = 0;
+        n < taps;
+        n++
+    ) {
 
-        const k = n - M;
+        const k =
+            n - center;
 
         let sinc;
 
 
         if (k === 0) {
 
-            sinc = 2 * fc;
+            sinc =
+                2 * fc;
 
         } else {
 
             sinc =
                 Math.sin(
-                    2 * Math.PI * fc * k
+                    2 *
+                    Math.PI *
+                    fc *
+                    k
                 )
                 /
-                (Math.PI * k);
+                (
+                    Math.PI * k
+                );
         }
 
-
-        /* Hamming window */
 
         const window =
             0.54 -
             0.46 *
             Math.cos(
-                (2 * Math.PI * n)
-                /
+                2 *
+                Math.PI *
+                n /
                 (taps - 1)
             );
 
@@ -315,17 +410,28 @@ function designFIRLowpass(
     }
 
 
-    /* Normalize DC gain */
-
     let sum = 0;
 
-    for (let i = 0; i < taps; i++) {
+    for (
+        let i = 0;
+        i < taps;
+        i++
+    ) {
+
         sum += h[i];
     }
 
 
-    for (let i = 0; i < taps; i++) {
-        h[i] /= sum;
+    if (Math.abs(sum) > 1e-12) {
+
+        for (
+            let i = 0;
+            i < taps;
+            i++
+        ) {
+
+            h[i] /= sum;
+        }
     }
 
 
@@ -357,7 +463,11 @@ function designFIRHighpass(
         (taps - 1) / 2;
 
 
-    for (let i = 0; i < taps; i++) {
+    for (
+        let i = 0;
+        i < taps;
+        i++
+    ) {
 
         high[i] =
             -low[i];
@@ -366,14 +476,12 @@ function designFIRHighpass(
 
     high[center] += 1;
 
-
     return high;
 }
 
 
 /* ============================================================
    FIR CONVOLUTION
-   Uses browser OfflineAudioContext
    ============================================================ */
 
 async function convolveOffline(
@@ -382,26 +490,26 @@ async function convolveOffline(
     fs
 ) {
 
-    const outputLength =
+    const length =
         input.length +
         kernel.length -
         1;
 
 
-    const ctx =
+    const context =
         new OfflineAudioContext(
             1,
-            outputLength,
+            length,
             fs
         );
 
 
     const source =
-        ctx.createBufferSource();
+        context.createBufferSource();
 
 
     const inputBuffer =
-        ctx.createBuffer(
+        context.createBuffer(
             1,
             input.length,
             fs
@@ -415,7 +523,7 @@ async function convolveOffline(
 
 
     const impulse =
-        ctx.createBuffer(
+        context.createBuffer(
             1,
             kernel.length,
             fs
@@ -429,12 +537,13 @@ async function convolveOffline(
 
 
     const convolver =
-        ctx.createConvolver();
+        context.createConvolver();
 
+    convolver.normalize =
+        false;
 
-    convolver.normalize = false;
-
-    convolver.buffer = impulse;
+    convolver.buffer =
+        impulse;
 
 
     source.buffer =
@@ -445,9 +554,8 @@ async function convolveOffline(
         convolver
     );
 
-
     convolver.connect(
-        ctx.destination
+        context.destination
     );
 
 
@@ -455,17 +563,15 @@ async function convolveOffline(
 
 
     const rendered =
-        await ctx.startRendering();
+        await context.startRendering();
 
 
-    const data =
-        rendered.getChannelData(0);
-
-
-    return data.slice(
-        0,
-        input.length
-    );
+    return rendered
+        .getChannelData(0)
+        .slice(
+            0,
+            input.length
+        );
 }
 
 
@@ -475,22 +581,25 @@ async function convolveOffline(
 
 function butterworthQValues(order) {
 
-    const q = [];
+    const values = [];
 
     const sections =
         order / 2;
 
 
-    for (let k = 0; k < sections; k++) {
+    for (
+        let k = 0;
+        k < sections;
+        k++
+    ) {
 
         const theta =
             Math.PI *
-            (2 * k + 1)
-            /
+            (2 * k + 1) /
             (2 * order);
 
 
-        q.push(
+        values.push(
             1 /
             (
                 2 *
@@ -500,7 +609,7 @@ function butterworthQValues(order) {
     }
 
 
-    return q;
+    return values;
 }
 
 
@@ -529,7 +638,6 @@ function processBiquad(
     const sin =
         Math.sin(w0);
 
-
     const alpha =
         sin /
         (2 * Q);
@@ -538,10 +646,6 @@ function processBiquad(
     let b0;
     let b1;
     let b2;
-
-    let a0;
-    let a1;
-    let a2;
 
 
     if (type === "lowpass") {
@@ -568,13 +672,13 @@ function processBiquad(
     }
 
 
-    a0 =
+    const a0 =
         1 + alpha;
 
-    a1 =
+    let a1 =
         -2 * cos;
 
-    a2 =
+    let a2 =
         1 - alpha;
 
 
@@ -586,7 +690,7 @@ function processBiquad(
     a2 /= a0;
 
 
-    const out =
+    const output =
         new Float32Array(
             input.length
         );
@@ -599,7 +703,11 @@ function processBiquad(
     let y2 = 0;
 
 
-    for (let i = 0; i < input.length; i++) {
+    for (
+        let i = 0;
+        i < input.length;
+        i++
+    ) {
 
         const x0 =
             input[i];
@@ -613,7 +721,8 @@ function processBiquad(
             a2 * y2;
 
 
-        out[i] = y0;
+        output[i] =
+            y0;
 
 
         x2 = x1;
@@ -624,7 +733,7 @@ function processBiquad(
     }
 
 
-    return out;
+    return output;
 }
 
 
@@ -659,24 +768,26 @@ function iirFilter(
         butterworthQValues(order);
 
 
-    let out =
+    let output =
         input.slice();
 
 
-    for (const q of qValues) {
+    for (
+        const Q of qValues
+    ) {
 
-        out =
+        output =
             processBiquad(
-                out,
+                output,
                 fs,
                 cutoff,
                 type,
-                q
+                Q
             );
     }
 
 
-    return out;
+    return output;
 }
 
 
@@ -685,39 +796,44 @@ function iirFilter(
    ============================================================ */
 
 function reverseBits(
-    x,
+    value,
     bits
 ) {
 
-    let y = 0;
+    let result = 0;
 
 
-    for (let i = 0; i < bits; i++) {
+    for (
+        let i = 0;
+        i < bits;
+        i++
+    ) {
 
-        y =
-            (y << 1) |
-            (x & 1);
+        result =
+            (
+                result << 1
+            )
+            |
+            (
+                value & 1
+            );
 
-        x >>>= 1;
+        value >>>= 1;
     }
 
 
-    return y;
+    return result;
 }
 
 
-/* ============================================================
-   RADIX-2 FFT
-   ============================================================ */
-
 function fft(
-    re,
-    im,
+    real,
+    imag,
     inverse = false
 ) {
 
     const n =
-        re.length;
+        real.length;
 
 
     const bits =
@@ -728,7 +844,11 @@ function fft(
 
     /* Bit reversal */
 
-    for (let i = 0; i < n; i++) {
+    for (
+        let i = 0;
+        i < n;
+        i++
+    ) {
 
         const j =
             reverseBits(
@@ -740,22 +860,22 @@ function fft(
         if (j > i) {
 
             let temp =
-                re[i];
+                real[i];
 
-            re[i] =
-                re[j];
+            real[i] =
+                real[j];
 
-            re[j] =
+            real[j] =
                 temp;
 
 
             temp =
-                im[i];
+                imag[i];
 
-            im[i] =
-                im[j];
+            imag[i] =
+                imag[j];
 
-            im[j] =
+            imag[j] =
                 temp;
         }
     }
@@ -773,23 +893,20 @@ function fft(
             size >> 1;
 
 
-        const sign =
-            inverse
-                ? 1
-                : -1;
-
-
         const angle =
-            sign *
+            (
+                inverse ? 1 : -1
+            )
+            *
             2 *
             Math.PI /
             size;
 
 
-        const wpr =
+        const cos =
             Math.cos(angle);
 
-        const wpi =
+        const sin =
             Math.sin(angle);
 
 
@@ -817,44 +934,44 @@ function fft(
 
 
                 const tr =
-                    wr * re[odd] -
-                    wi * im[odd];
+                    wr * real[odd] -
+                    wi * imag[odd];
 
 
                 const ti =
-                    wr * im[odd] +
-                    wi * re[odd];
+                    wr * imag[odd] +
+                    wi * real[odd];
 
 
                 const er =
-                    re[even];
+                    real[even];
 
                 const ei =
-                    im[even];
+                    imag[even];
 
 
-                re[even] =
+                real[even] =
                     er + tr;
 
-                im[even] =
+                imag[even] =
                     ei + ti;
 
 
-                re[odd] =
+                real[odd] =
                     er - tr;
 
-                im[odd] =
+                imag[odd] =
                     ei - ti;
 
 
                 const nextWr =
-                    wr * wpr -
-                    wi * wpi;
+                    wr * cos -
+                    wi * sin;
 
 
                 wi =
-                    wr * wpi +
-                    wi * wpr;
+                    wr * sin +
+                    wi * cos;
 
 
                 wr =
@@ -864,21 +981,23 @@ function fft(
     }
 
 
-    /* Inverse FFT scaling */
-
     if (inverse) {
 
-        for (let i = 0; i < n; i++) {
+        for (
+            let i = 0;
+            i < n;
+            i++
+        ) {
 
-            re[i] /= n;
-            im[i] /= n;
+            real[i] /= n;
+            imag[i] /= n;
         }
     }
 }
 
 
 /* ============================================================
-   FFT-BASED SPEECH / MUSIC SEPARATION
+   FFT SEPARATION
    ============================================================ */
 
 async function fftSeparation(
@@ -888,28 +1007,21 @@ async function fftSeparation(
     report
 ) {
 
-    /*
-       Frame-based FFT processing.
-
-       This avoids creating one enormous FFT
-       for the complete 4+ minute recording.
-    */
-
-
     const frameSize =
         16384;
-
 
     const hop =
         frameSize / 2;
 
 
-    const nFrames =
+    const frameCount =
         Math.max(
             1,
             Math.ceil(
-                (input.length - frameSize)
-                /
+                (
+                    input.length -
+                    frameSize
+                ) /
                 hop
             ) + 1
         );
@@ -961,7 +1073,7 @@ async function fftSeparation(
 
     for (
         let frame = 0;
-        frame < nFrames;
+        frame < frameCount;
         frame++
     ) {
 
@@ -969,19 +1081,17 @@ async function fftSeparation(
             frame * hop;
 
 
-        const re =
+        const real =
             new Float64Array(
                 frameSize
             );
 
 
-        const im =
+        const imag =
             new Float64Array(
                 frameSize
             );
 
-
-        /* Windowed input */
 
         for (
             let n = 0;
@@ -993,7 +1103,7 @@ async function fftSeparation(
                 start + n;
 
 
-            re[n] =
+            real[n] =
                 index < input.length
                     ? input[index] *
                       window[n]
@@ -1001,36 +1111,29 @@ async function fftSeparation(
         }
 
 
-        /* Forward FFT */
-
         fft(
-            re,
-            im,
+            real,
+            imag,
             false
         );
 
 
-        /*
-           Create separate spectra.
-        */
-
-        const speechRe =
+        const speechReal =
             new Float64Array(
                 frameSize
             );
 
-        const speechIm =
+        const speechImag =
             new Float64Array(
                 frameSize
             );
 
-
-        const musicRe =
+        const musicReal =
             new Float64Array(
                 frameSize
             );
 
-        const musicIm =
+        const musicImag =
             new Float64Array(
                 frameSize
             );
@@ -1057,56 +1160,50 @@ async function fftSeparation(
             } else {
 
                 frequency =
-                    (k - frameSize) *
+                    (
+                        k -
+                        frameSize
+                    ) *
                     fs /
                     frameSize;
             }
 
-
-            /*
-               Low frequencies → speech
-               High frequencies → music
-            */
 
             if (
                 Math.abs(frequency)
                 <= cutoff
             ) {
 
-                speechRe[k] =
-                    re[k];
+                speechReal[k] =
+                    real[k];
 
-                speechIm[k] =
-                    im[k];
+                speechImag[k] =
+                    imag[k];
 
             } else {
 
-                musicRe[k] =
-                    re[k];
+                musicReal[k] =
+                    real[k];
 
-                musicIm[k] =
-                    im[k];
+                musicImag[k] =
+                    imag[k];
             }
         }
 
 
-        /* Inverse FFT */
-
         fft(
-            speechRe,
-            speechIm,
+            speechReal,
+            speechImag,
             true
         );
 
 
         fft(
-            musicRe,
-            musicIm,
+            musicReal,
+            musicImag,
             true
         );
 
-
-        /* Overlap-add */
 
         for (
             let n = 0;
@@ -1124,12 +1221,12 @@ async function fftSeparation(
             ) {
 
                 speech[index] +=
-                    speechRe[n] *
+                    speechReal[n] *
                     window[n];
 
 
                 music[index] +=
-                    musicRe[n] *
+                    musicReal[n] *
                     window[n];
 
 
@@ -1144,17 +1241,16 @@ async function fftSeparation(
             report &&
             (
                 frame % 4 === 0 ||
-                frame === nFrames - 1
+                frame === frameCount - 1
             )
         ) {
 
             report(
-                25 +
-                35 *
+                20 +
+                40 *
                 (
-                    (frame + 1)
-                    /
-                    nFrames
+                    (frame + 1) /
+                    frameCount
                 )
             );
 
@@ -1169,8 +1265,6 @@ async function fftSeparation(
         }
     }
 
-
-    /* Normalize overlap */
 
     for (
         let i = 0;
@@ -1204,45 +1298,27 @@ async function fftSeparation(
 
 
 /* ============================================================
-   METRIC FUNCTIONS
+   METRICS
    ============================================================ */
-
-
-/*
-   Find the best time alignment between
-   reference and estimated signals.
-
-   This is important because FIR/IIR filters
-   can introduce phase/time delay.
-*/
 
 function findBestLag(
     reference,
     estimated,
-    maxLagSamples = 500
+    maxLagSamples = 1000
 ) {
 
-    const downsample =
-        8;
-
+    const step = 16;
 
     const maxLag =
         Math.floor(
-            maxLagSamples /
-            downsample
-        );
-
-
-    const usable =
-        Math.min(
-            reference.length,
-            estimated.length
+            maxLagSamples / step
         );
 
 
     const length =
         Math.min(
-            usable,
+            reference.length,
+            estimated.length,
             120000
         );
 
@@ -1259,28 +1335,26 @@ function findBestLag(
         lag++
     ) {
 
-        let sumXY = 0;
-        let sumX2 = 0;
-        let sumY2 = 0;
+        let xy = 0;
+        let xx = 0;
+        let yy = 0;
 
 
         for (
             let i = 0;
             i < length;
-            i += downsample
+            i += step
         ) {
 
             const j =
                 i +
-                lag *
-                downsample;
+                lag * step;
 
 
             if (
                 j < 0 ||
                 j >= length
             ) {
-
                 continue;
             }
 
@@ -1288,28 +1362,19 @@ function findBestLag(
             const x =
                 reference[i];
 
-
             const y =
                 estimated[j];
 
 
-            sumXY +=
-                x * y;
-
-
-            sumX2 +=
-                x * x;
-
-
-            sumY2 +=
-                y * y;
+            xy += x * y;
+            xx += x * x;
+            yy += y * y;
         }
 
 
         const denominator =
             Math.sqrt(
-                sumX2 *
-                sumY2
+                xx * yy
             );
 
 
@@ -1318,22 +1383,21 @@ function findBestLag(
             1e-12
         ) {
 
-            const corr =
-                sumXY /
+            const value =
+                xy /
                 denominator;
 
 
             if (
-                corr >
+                value >
                 bestCorrelation
             ) {
 
                 bestCorrelation =
-                    corr;
+                    value;
 
                 bestLag =
-                    lag *
-                    downsample;
+                    lag * step;
             }
         }
     }
@@ -1342,10 +1406,6 @@ function findBestLag(
     return bestLag;
 }
 
-
-/*
-   Create aligned portions.
-*/
 
 function alignedSignals(
     reference,
@@ -1366,26 +1426,27 @@ function alignedSignals(
         );
 
 
-    let refStart = 0;
-    let estStart = 0;
+    let referenceStart = 0;
+
+    let estimatedStart = 0;
 
 
     if (lag > 0) {
 
-        estStart =
+        estimatedStart =
             lag;
 
     } else {
 
-        refStart =
+        referenceStart =
             -lag;
     }
 
 
     const length =
         Math.min(
-            n - refStart,
-            n - estStart
+            n - referenceStart,
+            n - estimatedStart
         );
 
 
@@ -1393,25 +1454,18 @@ function alignedSignals(
 
         reference:
             reference.slice(
-                refStart,
-                refStart + length
+                referenceStart,
+                referenceStart + length
             ),
 
         estimated:
             estimated.slice(
-                estStart,
-                estStart + length
-            ),
-
-        lag:
-            lag
+                estimatedStart,
+                estimatedStart + length
+            )
     };
 }
 
-
-/* ============================================================
-   CORRELATION
-   ============================================================ */
 
 function correlation(
     reference,
@@ -1439,16 +1493,18 @@ function correlation(
         );
 
 
-    if (n === 0) {
-        return 0;
-    }
+    if (!n) return 0;
 
 
     let meanX = 0;
     let meanY = 0;
 
 
-    for (let i = 0; i < n; i++) {
+    for (
+        let i = 0;
+        i < n;
+        i++
+    ) {
 
         meanX += x[i];
         meanY += y[i];
@@ -1460,17 +1516,18 @@ function correlation(
 
 
     let numerator = 0;
-
-    let denominatorX = 0;
-
-    let denominatorY = 0;
+    let xx = 0;
+    let yy = 0;
 
 
-    for (let i = 0; i < n; i++) {
+    for (
+        let i = 0;
+        i < n;
+        i++
+    ) {
 
         const dx =
             x[i] - meanX;
-
 
         const dy =
             y[i] - meanY;
@@ -1479,34 +1536,28 @@ function correlation(
         numerator +=
             dx * dy;
 
-
-        denominatorX +=
+        xx +=
             dx * dx;
 
-
-        denominatorY +=
+        yy +=
             dy * dy;
     }
 
 
     const denominator =
         Math.sqrt(
-            denominatorX *
-            denominatorY
+            xx * yy
         );
 
 
-    return denominator
+    return denominator >
+        1e-12
         ? numerator / denominator
         : 0;
 }
 
 
-/* ============================================================
-   SNR
-   ============================================================ */
-
-function snr(
+function calculateSNR(
     reference,
     estimated
 ) {
@@ -1532,75 +1583,69 @@ function snr(
         );
 
 
-    if (n === 0) {
-        return 0;
-    }
+    if (!n) return 0;
 
 
-    let dot = 0;
-
-    let estimatedEnergy = 0;
-
-
-    for (let i = 0; i < n; i++) {
-
-        dot +=
-            x[i] *
-            y[i];
+    let xy = 0;
+    let yy = 0;
 
 
-        estimatedEnergy +=
-            y[i] *
-            y[i];
+    for (
+        let i = 0;
+        i < n;
+        i++
+    ) {
+
+        xy +=
+            x[i] * y[i];
+
+        yy +=
+            y[i] * y[i];
     }
 
 
     const scale =
-        dot /
+        xy /
         (
-            estimatedEnergy +
-            1e-12
+            yy + 1e-12
         );
 
 
     let signalPower = 0;
-
     let errorPower = 0;
 
 
-    for (let i = 0; i < n; i++) {
+    for (
+        let i = 0;
+        i < n;
+        i++
+    ) {
 
         const estimate =
-            scale *
-            y[i];
+            scale * y[i];
 
 
         const error =
-            x[i] -
-            estimate;
+            x[i] - estimate;
 
 
         signalPower +=
-            x[i] *
-            x[i];
+            x[i] * x[i];
 
 
         errorPower +=
-            error *
-            error;
+            error * error;
     }
 
 
     signalPower /= n;
-
     errorPower /= n;
 
 
     if (
-        errorPower <=
+        errorPower <
         1e-15
     ) {
-
         return Infinity;
     }
 
@@ -1615,11 +1660,7 @@ function snr(
 }
 
 
-/* ============================================================
-   RMSE
-   ============================================================ */
-
-function rmse(
+function calculateRMSE(
     reference,
     estimated
 ) {
@@ -1645,46 +1686,46 @@ function rmse(
         );
 
 
-    if (n === 0) {
-        return 0;
-    }
+    if (!n) return 0;
 
 
-    let dot = 0;
-
-    let energy = 0;
-
-
-    for (let i = 0; i < n; i++) {
-
-        dot +=
-            x[i] *
-            y[i];
+    let xy = 0;
+    let yy = 0;
 
 
-        energy +=
-            y[i] *
-            y[i];
+    for (
+        let i = 0;
+        i < n;
+        i++
+    ) {
+
+        xy +=
+            x[i] * y[i];
+
+        yy +=
+            y[i] * y[i];
     }
 
 
     const scale =
-        dot /
+        xy /
         (
-            energy +
-            1e-12
+            yy + 1e-12
         );
 
 
     let error = 0;
 
 
-    for (let i = 0; i < n; i++) {
+    for (
+        let i = 0;
+        i < n;
+        i++
+    ) {
 
         const difference =
             x[i] -
-            scale *
-            y[i];
+            scale * y[i];
 
 
         error +=
@@ -1699,19 +1740,13 @@ function rmse(
 }
 
 
-/* ============================================================
-   METRIC TABLE ROW
-   ============================================================ */
-
-function fmt(value) {
+function formatMetric(value) {
 
     if (
         !Number.isFinite(value)
     ) {
-
         return "∞";
     }
-
 
     return value.toFixed(4);
 }
@@ -1747,59 +1782,47 @@ function metricsRow(
     <tr>
         <td>${method}</td>
 
-        <td>
-            ${fmt(
-                correlation(
-                    speechRef,
-                    speech
-                )
-            )}
-        </td>
+        <td>${formatMetric(
+            correlation(
+                speechRef,
+                speech
+            )
+        )}</td>
 
-        <td>
-            ${fmt(
-                correlation(
-                    musicRef,
-                    music
-                )
-            )}
-        </td>
+        <td>${formatMetric(
+            correlation(
+                musicRef,
+                music
+            )
+        )}</td>
 
-        <td>
-            ${fmt(
-                snr(
-                    speechRef,
-                    speech
-                )
-            )}
-        </td>
+        <td>${formatMetric(
+            calculateSNR(
+                speechRef,
+                speech
+            )
+        )}</td>
 
-        <td>
-            ${fmt(
-                snr(
-                    musicRef,
-                    music
-                )
-            )}
-        </td>
+        <td>${formatMetric(
+            calculateSNR(
+                musicRef,
+                music
+            )
+        )}</td>
 
-        <td>
-            ${fmt(
-                rmse(
-                    speechRef,
-                    speech
-                )
-            )}
-        </td>
+        <td>${formatMetric(
+            calculateRMSE(
+                speechRef,
+                speech
+            )
+        )}</td>
 
-        <td>
-            ${fmt(
-                rmse(
-                    musicRef,
-                    music
-                )
-            )}
-        </td>
+        <td>${formatMetric(
+            calculateRMSE(
+                musicRef,
+                music
+            )
+        )}</td>
     </tr>`;
 }
 
@@ -1808,13 +1831,11 @@ function metricsRow(
    CANVAS SETUP
    ============================================================ */
 
-function clearCanvas(
-    canvas
-) {
+function clearCanvas(canvas) {
 
-    const dpr =
-        window.devicePixelRatio ||
-        1;
+    if (!canvas) {
+        return null;
+    }
 
 
     const rect =
@@ -1832,27 +1853,34 @@ function clearCanvas(
 
     const height =
         Math.max(
-            230,
+            240,
             Math.floor(
                 rect.height
             )
         );
 
 
+    const dpr =
+        Math.min(
+            window.devicePixelRatio || 1,
+            2
+        );
+
+
     canvas.width =
-        width *
-        dpr;
+        Math.floor(
+            width * dpr
+        );
 
 
     canvas.height =
-        height *
-        dpr;
+        Math.floor(
+            height * dpr
+        );
 
 
     const ctx =
-        canvas.getContext(
-            "2d"
-        );
+        canvas.getContext("2d");
 
 
     ctx.setTransform(
@@ -1873,19 +1901,32 @@ function clearCanvas(
     );
 
 
+    /*
+       White background makes the graphs
+       much sharper when captured/screenshot.
+    */
+
+    ctx.fillStyle =
+        "#ffffff";
+
+    ctx.fillRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+
     return {
-
-        ctx: ctx,
-
+        ctx,
         w: width,
-
         h: height
     };
 }
 
 
 /* ============================================================
-   GRAPH AXES
+   AXES
    ============================================================ */
 
 function drawAxes(
@@ -1893,59 +1934,84 @@ function drawAxes(
     w,
     h,
     xLabel,
-    yLabel
+    yLabel,
+    top = 42
 ) {
 
-    const left = 60;
-    const right = 20;
-    const top = 30;
+    const left = 62;
+    const right = 24;
     const bottom = 42;
 
 
     ctx.strokeStyle =
-        "#d9dce7";
-
+        "#d9dee8";
 
     ctx.lineWidth = 1;
 
 
     ctx.beginPath();
 
-
     ctx.moveTo(
         left,
         top
     );
 
-
     ctx.lineTo(
         left,
         h - bottom
     );
-
 
     ctx.lineTo(
         w - right,
         h - bottom
     );
 
+    ctx.stroke();
+
+
+    /*
+       Horizontal zero/reference grid.
+    */
+
+    const middle =
+        top +
+        (
+            h -
+            top -
+            bottom
+        ) / 2;
+
+
+    ctx.strokeStyle =
+        "#edf0f5";
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        left,
+        middle
+    );
+
+    ctx.lineTo(
+        w - right,
+        middle
+    );
 
     ctx.stroke();
 
 
-    /* X-axis label */
+    /*
+       X axis label.
+    */
 
     ctx.fillStyle =
         "#68718b";
 
-
     ctx.font =
         "12px Arial";
 
-
     ctx.textAlign =
         "right";
-
 
     ctx.fillText(
         xLabel,
@@ -1954,25 +2020,23 @@ function drawAxes(
     );
 
 
-    /* Y-axis label */
+    /*
+       Y axis label.
+    */
 
     ctx.save();
-
 
     ctx.translate(
         15,
         h / 2
     );
 
-
     ctx.rotate(
         -Math.PI / 2
     );
 
-
     ctx.textAlign =
         "center";
-
 
     ctx.fillText(
         yLabel,
@@ -1980,12 +2044,10 @@ function drawAxes(
         0
     );
 
-
     ctx.restore();
 
 
     return {
-
         left,
         right,
         top,
@@ -1995,7 +2057,7 @@ function drawAxes(
 
 
 /* ============================================================
-   TIME-DOMAIN WAVEFORM
+   CLEAN WAVEFORM GRAPH
    ============================================================ */
 
 function drawWave(
@@ -2005,15 +2067,59 @@ function drawWave(
     title
 ) {
 
-    const {
+    const canvas =
+        $(canvasId);
 
+    if (!canvas) return;
+
+
+    const graph =
+        clearCanvas(canvas);
+
+
+    const {
         ctx,
         w,
         h
+    } = graph;
 
-    } =
-        clearCanvas(
-            $(canvasId)
+
+    /*
+       Show 15 seconds.
+       This is enough to demonstrate
+       the waveform without making it
+       look like a solid block.
+    */
+
+    const seconds =
+        Math.min(
+            15,
+            data.length / fs
+        );
+
+
+    const sampleCount =
+        Math.max(
+            1,
+            Math.floor(
+                seconds * fs
+            )
+        );
+
+
+    /*
+       Around 2500 visual points.
+    */
+
+    const maxPoints = 2500;
+
+    const step =
+        Math.max(
+            1,
+            Math.floor(
+                sampleCount /
+                maxPoints
+            )
         );
 
 
@@ -2023,94 +2129,30 @@ function drawWave(
             w,
             h,
             "Time (s)",
-            "Amplitude"
+            "Amplitude",
+            38
         );
 
 
-    const maxSeconds =
-        Math.min(
-            30,
-            data.length / fs
-        );
+    /*
+       Fixed amplitude range gives
+       consistent graphs.
+    */
+
+    const minAmplitude = -1;
+
+    const maxAmplitude = 1;
 
 
-    const end =
-        Math.max(
-            1,
-            Math.floor(
-                maxSeconds *
-                fs
-            )
-        );
-
-
-    const points =
-        Math.min(
-            5000,
-            end
-        );
-
-
-    const step =
-        Math.max(
-            1,
-            Math.floor(
-                end / points
-            )
-        );
-
-
-    let min =
-        Infinity;
-
-
-    let max =
-        -Infinity;
-
-
-    for (
-        let i = 0;
-        i < end;
-        i += step
-    ) {
-
-        const value =
-            data[i];
-
-
-        min =
-            Math.min(
-                min,
-                value
-            );
-
-
-        max =
-            Math.max(
-                max,
-                value
-            );
-    }
-
-
-    if (
-        Math.abs(
-            max - min
-        ) < 1e-8
-    ) {
-
-        min = -1;
-        max = 1;
-    }
-
+    /*
+       Waveform.
+    */
 
     ctx.strokeStyle =
         "#6540c7";
 
-
     ctx.lineWidth =
-        1.1;
-
+        1.15;
 
     ctx.beginPath();
 
@@ -2120,18 +2162,19 @@ function drawWave(
 
     for (
         let i = 0;
-        i < end;
+        i < sampleCount;
         i += step
     ) {
+
+        const time =
+            i / fs;
+
 
         const x =
             axis.left +
             (
-                point /
-                Math.max(
-                    1,
-                    points - 1
-                )
+                time /
+                seconds
             ) *
             (
                 w -
@@ -2140,17 +2183,27 @@ function drawWave(
             );
 
 
+        const value =
+            Math.max(
+                minAmplitude,
+                Math.min(
+                    maxAmplitude,
+                    data[i]
+                )
+            );
+
+
         const y =
             axis.top +
             (
                 1 -
                 (
-                    data[i] -
-                    min
+                    value -
+                    minAmplitude
                 ) /
                 (
-                    max -
-                    min
+                    maxAmplitude -
+                    minAmplitude
                 )
             ) *
             (
@@ -2183,30 +2236,78 @@ function drawWave(
     ctx.stroke();
 
 
-    /* Graph title */
+    /*
+       Title.
+    */
 
     ctx.fillStyle =
         "#17203a";
 
-
     ctx.font =
         "bold 12px Arial";
-
 
     ctx.textAlign =
         "left";
 
-
     ctx.fillText(
         title,
         axis.left,
-        17
+        18
     );
+
+
+    /*
+       Small time ticks.
+    */
+
+    ctx.fillStyle =
+        "#7b8498";
+
+    ctx.font =
+        "10px Arial";
+
+    ctx.textAlign =
+        "center";
+
+
+    const ticks = 5;
+
+
+    for (
+        let i = 0;
+        i <= ticks;
+        i++
+    ) {
+
+        const time =
+            seconds *
+            i /
+            ticks;
+
+
+        const x =
+            axis.left +
+            (
+                i / ticks
+            ) *
+            (
+                w -
+                axis.left -
+                axis.right
+            );
+
+
+        ctx.fillText(
+            `${time.toFixed(1)}`,
+            x,
+            h - 26
+        );
+    }
 }
 
 
 /* ============================================================
-   FFT MAGNITUDE SPECTRUM
+   SPECTRUM CALCULATION
    ============================================================ */
 
 function magnitudeSpectrum(
@@ -2214,19 +2315,16 @@ function magnitudeSpectrum(
     fs
 ) {
 
-    const maxSeconds =
-        Math.min(
-            60,
-            data.length / fs
-        );
+    /*
+       Use first 30 seconds,
+       but limit FFT size.
+    */
 
-
-    const count =
+    const maximumSamples =
         Math.min(
             data.length,
             Math.floor(
-                maxSeconds *
-                fs
+                30 * fs
             ),
             262144
         );
@@ -2236,22 +2334,23 @@ function magnitudeSpectrum(
 
 
     while (
-        (n << 1) <= count
+        (n << 1) <= maximumSamples
     ) {
 
         n <<= 1;
     }
 
 
-    const re =
+    const real =
+        new Float64Array(n);
+
+    const imag =
         new Float64Array(n);
 
 
-    const im =
-        new Float64Array(n);
-
-
-    /* Hann window */
+    /*
+       Hann window.
+    */
 
     for (
         let i = 0;
@@ -2270,15 +2369,15 @@ function magnitudeSpectrum(
             );
 
 
-        re[i] =
+        real[i] =
             data[i] *
             window;
     }
 
 
     fft(
-        re,
-        im,
+        real,
+        imag,
         false
     );
 
@@ -2317,16 +2416,16 @@ function magnitudeSpectrum(
                 Math.max(
                     1e-10,
                     Math.hypot(
-                        re[k],
-                        im[k]
-                    ) / n
+                        real[k],
+                        imag[k]
+                    ) /
+                    n
                 )
             );
     }
 
 
     return {
-
         frequency,
         magnitude
     };
@@ -2334,7 +2433,7 @@ function magnitudeSpectrum(
 
 
 /* ============================================================
-   INDIVIDUAL SPECTRUM GRAPH
+   CLEAN SPECTRUM GRAPH
    ============================================================ */
 
 function drawSpectrum(
@@ -2345,16 +2444,21 @@ function drawSpectrum(
     cutoff
 ) {
 
-    const {
+    const canvas =
+        $(canvasId);
 
+    if (!canvas) return;
+
+
+    const graph =
+        clearCanvas(canvas);
+
+
+    const {
         ctx,
         w,
         h
-
-    } =
-        clearCanvas(
-            $(canvasId)
-        );
+    } = graph;
 
 
     const axis =
@@ -2363,7 +2467,8 @@ function drawSpectrum(
             w,
             h,
             "Frequency (Hz)",
-            "Magnitude (dB)"
+            "Magnitude (dB)",
+            40
         );
 
 
@@ -2374,6 +2479,11 @@ function drawSpectrum(
         );
 
 
+    /*
+       Show 0–8 kHz,
+       exactly like your current project.
+    */
+
     const maxFrequency =
         Math.min(
             8000,
@@ -2381,94 +2491,50 @@ function drawSpectrum(
         );
 
 
-    let minDb =
-        Infinity;
+    const minDb = -90;
+
+    const maxDb = 0;
 
 
-    let maxDb =
-        -Infinity;
+    /*
+       Maximum number of visual
+       points. This is the main
+       anti-blur improvement.
+    */
+
+    const maxPoints = 1800;
 
 
-    for (
-        let i = 0;
-        i <
+    const totalBins =
         spectrum.frequency.length;
-        i++
-    ) {
-
-        if (
-            spectrum.frequency[i]
-            >
-            maxFrequency
-        ) {
-
-            break;
-        }
 
 
-        minDb =
-            Math.min(
-                minDb,
-                spectrum.magnitude[i]
-            );
-
-
-        maxDb =
-            Math.max(
-                maxDb,
-                spectrum.magnitude[i]
-            );
-    }
-
-
-    minDb =
-        Math.min(
-            minDb,
-            -100
-        );
-
-
-    maxDb =
+    const step =
         Math.max(
-            maxDb,
-            0
+            1,
+            Math.ceil(
+                totalBins /
+                maxPoints
+            )
         );
 
-
-    if (
-        maxDb -
-        minDb
-        <
-        10
-    ) {
-
-        maxDb =
-            minDb + 10;
-    }
-
-
-    /* Spectrum */
 
     ctx.strokeStyle =
-        "#0b91a6";
-
+        "#0798ad";
 
     ctx.lineWidth =
-        1.25;
-
+        1.2;
 
     ctx.beginPath();
 
 
-    let started =
-        false;
+    let started = false;
 
 
     for (
         let i = 0;
-        i <
-        spectrum.frequency.length;
-        i++
+        i < totalBins;
+        i += step
     ) {
 
         const frequency =
@@ -2479,9 +2545,18 @@ function drawSpectrum(
             frequency >
             maxFrequency
         ) {
-
             break;
         }
+
+
+        const db =
+            Math.max(
+                minDb,
+                Math.min(
+                    maxDb,
+                    spectrum.magnitude[i]
+                )
+            );
 
 
         const x =
@@ -2502,7 +2577,7 @@ function drawSpectrum(
             (
                 1 -
                 (
-                    spectrum.magnitude[i] -
+                    db -
                     minDb
                 ) /
                 (
@@ -2539,12 +2614,13 @@ function drawSpectrum(
     ctx.stroke();
 
 
-    /* Cutoff */
+    /*
+       Cutoff line.
+    */
 
     if (
-        cutoff &&
-        cutoff <
-        maxFrequency
+        cutoff > 0 &&
+        cutoff < maxFrequency
     ) {
 
         const cutoffX =
@@ -2563,10 +2639,8 @@ function drawSpectrum(
         ctx.strokeStyle =
             "#e17b20";
 
-
         ctx.lineWidth =
-            1.5;
-
+            1.4;
 
         ctx.setLineDash(
             [6, 5]
@@ -2575,19 +2649,16 @@ function drawSpectrum(
 
         ctx.beginPath();
 
-
         ctx.moveTo(
             cutoffX,
             axis.top
         );
-
 
         ctx.lineTo(
             cutoffX,
             h -
             axis.bottom
         );
-
 
         ctx.stroke();
 
@@ -2598,10 +2669,8 @@ function drawSpectrum(
         ctx.fillStyle =
             "#c46a16";
 
-
         ctx.font =
             "11px Arial";
-
 
         ctx.textAlign =
             "left";
@@ -2610,23 +2679,23 @@ function drawSpectrum(
         ctx.fillText(
             `Cutoff ${cutoff} Hz`,
             Math.min(
-                cutoffX + 6,
-                w - 100
+                cutoffX + 7,
+                w - 110
             ),
             axis.top + 16
         );
     }
 
 
-    /* Title */
+    /*
+       Title.
+    */
 
     ctx.fillStyle =
         "#17203a";
 
-
     ctx.font =
         "bold 12px Arial";
-
 
     ctx.textAlign =
         "left";
@@ -2635,8 +2704,59 @@ function drawSpectrum(
     ctx.fillText(
         title,
         axis.left,
-        17
+        18
     );
+
+
+    /*
+       Frequency ticks.
+    */
+
+    ctx.fillStyle =
+        "#7b8498";
+
+    ctx.font =
+        "10px Arial";
+
+    ctx.textAlign =
+        "center";
+
+
+    const frequencyTicks =
+        [0, 2000, 4000, 6000, 8000];
+
+
+    for (
+        const frequency of frequencyTicks
+    ) {
+
+        if (
+            frequency >
+            maxFrequency
+        ) {
+            continue;
+        }
+
+
+        const x =
+            axis.left +
+            (
+                frequency /
+                maxFrequency
+            ) *
+            (
+                w -
+                axis.left -
+                axis.right
+            );
+
+
+        ctx.fillText(
+            `${frequency}`,
+            x,
+            h - 26
+        );
+    }
 }
 
 
@@ -2650,15 +2770,38 @@ function drawOverallWave(
     fs
 ) {
 
-    const {
+    const canvas =
+        $(canvasId);
 
+    if (!canvas) return;
+
+
+    const graph =
+        clearCanvas(canvas);
+
+
+    const {
         ctx,
         w,
         h
+    } = graph;
 
-    } =
-        clearCanvas(
-            $(canvasId)
+
+    /*
+       12 seconds gives a clean
+       side-by-side comparison.
+    */
+
+    const seconds =
+        Math.min(
+            12,
+            series[0].data.length / fs
+        );
+
+
+    const sampleCount =
+        Math.floor(
+            seconds * fs
         );
 
 
@@ -2668,78 +2811,112 @@ function drawOverallWave(
             w,
             h,
             "Time (s)",
-            "Amplitude"
+            "Amplitude",
+            58
         );
 
 
-    const maxSeconds =
-        Math.min(
-            30,
-            series[0].data.length / fs
-        );
+    const colors = [
+        "#17203a",
+        "#6540c7",
+        "#0798ad",
+        "#d27618"
+    ];
 
 
-    const end =
-        Math.max(
-            1,
-            Math.floor(
-                maxSeconds *
-                fs
-            )
-        );
-
-
-    const points =
-        3000;
-
-
-    const step =
-        Math.max(
-            1,
-            Math.floor(
-                end / points
-            )
-        );
-
-
-    /*
-       Each series gets its own color.
-    */
-
-    const styles = [
-
-        ["#101936", "Mixed Input"],
-
-        ["#6540c7", "FFT Speech"],
-
-        ["#0b91a6", "FIR Speech"],
-
-        ["#d06f19", "IIR Speech"]
+    const labels = [
+        "Mixed Input",
+        "FFT Speech",
+        "FIR Speech",
+        "IIR Speech"
     ];
 
 
     /*
-       Use fixed amplitude range so
-       the comparison is visually meaningful.
+       Draw clean legend ABOVE the graph.
     */
 
-    let min =
-        -1;
+    let legendX =
+        axis.left;
 
-    let max =
-        1;
+
+    const legendY = 31;
+
+
+    ctx.font =
+        "bold 11px Arial";
+
+    ctx.textAlign =
+        "left";
+
+
+    for (
+        let i = 0;
+        i < Math.min(
+            series.length,
+            labels.length
+        );
+        i++
+    ) {
+
+        ctx.strokeStyle =
+            colors[i];
+
+        ctx.lineWidth = 3;
+
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            legendX,
+            legendY
+        );
+
+        ctx.lineTo(
+            legendX + 18,
+            legendY
+        );
+
+        ctx.stroke();
+
+
+        ctx.fillStyle =
+            colors[i];
+
+
+        ctx.fillText(
+            labels[i],
+            legendX + 24,
+            legendY + 4
+        );
+
+
+        legendX += 135;
+    }
 
 
     /*
        Draw each waveform.
     */
 
+    const maxPoints = 1800;
+
+
+    const step =
+        Math.max(
+            1,
+            Math.floor(
+                sampleCount /
+                maxPoints
+            )
+        );
+
+
     for (
         let s = 0;
-        s <
-        Math.min(
-            styles.length,
-            series.length
+        s < Math.min(
+            series.length,
+            colors.length
         );
         s++
     ) {
@@ -2749,13 +2926,19 @@ function drawOverallWave(
 
 
         ctx.strokeStyle =
-            styles[s][0];
+            colors[s];
 
 
         ctx.lineWidth =
             s === 0
                 ? 1.25
-                : 1.0;
+                : 1.05;
+
+
+        ctx.globalAlpha =
+            s === 0
+                ? 0.65
+                : 0.78;
 
 
         ctx.beginPath();
@@ -2766,17 +2949,19 @@ function drawOverallWave(
 
         for (
             let i = 0;
-            i < end;
+            i < sampleCount;
             i += step
         ) {
+
+            const time =
+                i / fs;
+
 
             const x =
                 axis.left +
                 (
-                    point /
-                    (
-                        points - 1
-                    )
+                    time /
+                    seconds
                 ) *
                 (
                     w -
@@ -2785,11 +2970,11 @@ function drawOverallWave(
                 );
 
 
-            const clipped =
+            const value =
                 Math.max(
-                    min,
+                    -1,
                     Math.min(
-                        max,
+                        1,
                         data[i]
                     )
                 );
@@ -2800,13 +2985,8 @@ function drawOverallWave(
                 (
                     1 -
                     (
-                        clipped -
-                        min
-                    ) /
-                    (
-                        max -
-                        min
-                    )
+                        value + 1
+                    ) / 2
                 ) *
                 (
                     h -
@@ -2841,61 +3021,33 @@ function drawOverallWave(
     }
 
 
+    ctx.globalAlpha = 1;
+
+
     /*
-       LEGEND
-       This is deliberately placed at the TOP,
-       not on the X-axis.
+       Title.
     */
 
-    const legendY =
-        axis.top + 5;
-
-
-    let legendX =
-        axis.left;
-
+    ctx.fillStyle =
+        "#17203a";
 
     ctx.font =
-        "bold 11px Arial";
+        "bold 13px Arial";
+
+    ctx.textAlign =
+        "left";
 
 
-    for (
-        let i = 0;
-        i <
-        Math.min(
-            styles.length,
-            series.length
-        );
-        i++
-    ) {
-
-        ctx.fillStyle =
-            styles[i][0];
-
-
-        ctx.fillRect(
-            legendX,
-            legendY - 8,
-            20,
-            3
-        );
-
-
-        ctx.fillText(
-            styles[i][1],
-            legendX + 26,
-            legendY - 4
-        );
-
-
-        legendX +=
-            115;
-    }
+    ctx.fillText(
+        "Overall Waveform Comparison",
+        axis.left,
+        17
+    );
 }
 
 
 /* ============================================================
-   OVERALL FFT SPECTRUM COMPARISON
+   OVERALL FFT SPECTRUM
    ============================================================ */
 
 function drawOverallSpec(
@@ -2904,16 +3056,21 @@ function drawOverallSpec(
     fs
 ) {
 
-    const {
+    const canvas =
+        $(canvasId);
 
+    if (!canvas) return;
+
+
+    const graph =
+        clearCanvas(canvas);
+
+
+    const {
         ctx,
         w,
         h
-
-    } =
-        clearCanvas(
-            $(canvasId)
-        );
+    } = graph;
 
 
     const axis =
@@ -2922,7 +3079,8 @@ function drawOverallSpec(
             w,
             h,
             "Frequency (Hz)",
-            "Magnitude (dB)"
+            "Magnitude (dB)",
+            58
         );
 
 
@@ -2933,40 +3091,99 @@ function drawOverallSpec(
         );
 
 
-    const styles = [
+    const colors = [
+        "#17203a",
+        "#6540c7",
+        "#0798ad",
+        "#d27618"
+    ];
 
-        ["#101936", "Mixed Input"],
 
-        ["#6540c7", "FFT Speech"],
-
-        ["#0b91a6", "FIR Speech"],
-
-        ["#d06f19", "IIR Speech"]
+    const labels = [
+        "Mixed Input",
+        "FFT Speech",
+        "FIR Speech",
+        "IIR Speech"
     ];
 
 
     /*
-       Find common dB scale.
+       Legend at top.
     */
 
-    const minDb =
-        -100;
+    let legendX =
+        axis.left;
 
 
-    const maxDb =
-        0;
+    const legendY = 31;
+
+
+    ctx.font =
+        "bold 11px Arial";
+
+    ctx.textAlign =
+        "left";
+
+
+    for (
+        let i = 0;
+        i < Math.min(
+            series.length,
+            labels.length
+        );
+        i++
+    ) {
+
+        ctx.strokeStyle =
+            colors[i];
+
+        ctx.lineWidth = 3;
+
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            legendX,
+            legendY
+        );
+
+        ctx.lineTo(
+            legendX + 18,
+            legendY
+        );
+
+        ctx.stroke();
+
+
+        ctx.fillStyle =
+            colors[i];
+
+
+        ctx.fillText(
+            labels[i],
+            legendX + 24,
+            legendY + 4
+        );
+
+
+        legendX += 135;
+    }
 
 
     /*
        Draw spectra.
     */
 
+    const minDb = -90;
+
+    const maxDb = 0;
+
+
     for (
         let s = 0;
-        s <
-        Math.min(
-            styles.length,
-            series.length
+        s < Math.min(
+            series.length,
+            colors.length
         );
         s++
     ) {
@@ -2978,28 +3195,49 @@ function drawOverallSpec(
             );
 
 
+        const totalBins =
+            spectrum.frequency.length;
+
+
+        const maxPoints = 1500;
+
+
+        const step =
+            Math.max(
+                1,
+                Math.ceil(
+                    totalBins /
+                    maxPoints
+                )
+            );
+
+
         ctx.strokeStyle =
-            styles[s][0];
+            colors[s];
 
 
         ctx.lineWidth =
             s === 0
                 ? 1.25
-                : 1.0;
+                : 1.05;
+
+
+        ctx.globalAlpha =
+            s === 0
+                ? 0.55
+                : 0.70;
 
 
         ctx.beginPath();
 
 
-        let started =
-            false;
+        let started = false;
 
 
         for (
             let i = 0;
-            i <
-            spectrum.frequency.length;
-            i++
+            i < totalBins;
+            i += step
         ) {
 
             const frequency =
@@ -3010,9 +3248,18 @@ function drawOverallSpec(
                 frequency >
                 maxFrequency
             ) {
-
                 break;
             }
+
+
+            const db =
+                Math.max(
+                    minDb,
+                    Math.min(
+                        maxDb,
+                        spectrum.magnitude[i]
+                    )
+                );
 
 
             const x =
@@ -3025,16 +3272,6 @@ function drawOverallSpec(
                     w -
                     axis.left -
                     axis.right
-                );
-
-
-            const db =
-                Math.max(
-                    minDb,
-                    Math.min(
-                        maxDb,
-                        spectrum.magnitude[i]
-                    )
                 );
 
 
@@ -3058,9 +3295,7 @@ function drawOverallSpec(
                 );
 
 
-            if (
-                !started
-            ) {
+            if (!started) {
 
                 ctx.moveTo(
                     x,
@@ -3083,66 +3318,90 @@ function drawOverallSpec(
     }
 
 
+    ctx.globalAlpha = 1;
+
+
     /*
-       LEGEND
-       Top of graph.
+       Title.
     */
 
-    let legendX =
-        axis.left;
-
-
-    const legendY =
-        axis.top + 5;
-
+    ctx.fillStyle =
+        "#17203a";
 
     ctx.font =
-        "bold 11px Arial";
+        "bold 13px Arial";
+
+    ctx.textAlign =
+        "left";
+
+
+    ctx.fillText(
+        "Overall FFT Spectrum Comparison",
+        axis.left,
+        17
+    );
+
+
+    /*
+       Frequency ticks.
+    */
+
+    ctx.fillStyle =
+        "#7b8498";
+
+    ctx.font =
+        "10px Arial";
+
+    ctx.textAlign =
+        "center";
+
+
+    const ticks =
+        [0, 2000, 4000, 6000, 8000];
 
 
     for (
-        let i = 0;
-        i <
-        Math.min(
-            styles.length,
-            series.length
-        );
-        i++
+        const frequency of ticks
     ) {
 
-        ctx.fillStyle =
-            styles[i][0];
+        if (
+            frequency >
+            maxFrequency
+        ) {
+            continue;
+        }
 
 
-        ctx.fillRect(
-            legendX,
-            legendY - 8,
-            20,
-            3
-        );
+        const x =
+            axis.left +
+            (
+                frequency /
+                maxFrequency
+            ) *
+            (
+                w -
+                axis.left -
+                axis.right
+            );
 
 
         ctx.fillText(
-            styles[i][1],
-            legendX + 26,
-            legendY - 4
+            `${frequency}`,
+            x,
+            h - 26
         );
-
-
-        legendX +=
-            115;
     }
 }
 
 
 /* ============================================================
-   MAIN PROJECT PROCESSING
+   MAIN PROCESS
    ============================================================ */
 
 async function processProject() {
 
     const mixFile =
-        $("mixFile").files[0];
+        $("mixFile")?.files[0];
 
 
     if (!mixFile) {
@@ -3159,50 +3418,55 @@ async function processProject() {
         true;
 
 
-    $("results").classList.add(
-        "hidden"
+    if ($("results")) {
+
+        $("results")
+            .classList
+            .add("hidden");
+    }
+
+
+    /*
+       Clean old object URLs.
+    */
+
+    objectUrls.forEach(
+        url =>
+            URL.revokeObjectURL(url)
     );
 
 
-    /* Remove previous audio URLs */
-
-    currentObjectUrls.forEach(
-        URL.revokeObjectURL
-    );
-
-
-    currentObjectUrls = [];
+    objectUrls = [];
 
 
     try {
 
-        /* ====================================================
-           LOAD MIX
-           ==================================================== */
+        /* ----------------------------------------------------
+           MIXED INPUT
+           ---------------------------------------------------- */
 
         setStatus(
-            "Decoding mixed audio...",
+            "Loading mixed audio...",
             2
         );
 
 
-        const mixDecoded =
+        const mixAudio =
             await decodeFile(
                 mixFile
             );
 
 
         const mix =
-            mixDecoded.samples;
-
+            mixAudio.samples;
 
         const fs =
-            mixDecoded.fs;
+            mixAudio.fs;
 
 
-        /* ====================================================
+        /* ----------------------------------------------------
            PARAMETERS
-           ==================================================== */
+           ---------------------------------------------------- */
 
         const cutoff =
             Number(
@@ -3219,14 +3483,8 @@ async function processProject() {
 
 
         const iirOrder =
-            Math.max(
-                2,
-                Math.min(
-                    8,
-                    Number(
-                        $("iirOrder").value
-                    )
-                )
+            Number(
+                $("iirOrder").value
             );
 
 
@@ -3241,32 +3499,38 @@ async function processProject() {
         }
 
 
-        /* ====================================================
+        /* ----------------------------------------------------
            FFT
-           ==================================================== */
+           ---------------------------------------------------- */
 
         setStatus(
-            `Loaded ${mix.length.toLocaleString()} samples at ${fs} Hz. Running FFT separation...`,
+            "Running FFT frequency-domain separation...",
             5
         );
 
 
-        const fftOut =
+        const fftOutput =
             await fftSeparation(
                 mix,
                 fs,
                 cutoff,
-                setProgress
+                progress => {
+
+                    setStatus(
+                        "FFT separation in progress...",
+                        progress
+                    );
+                }
             );
 
 
-        /* ====================================================
+        /* ----------------------------------------------------
            FIR
-           ==================================================== */
+           ---------------------------------------------------- */
 
         setStatus(
-            "Running FIR low-pass / high-pass filters...",
-            63
+            "Designing FIR filters...",
+            65
         );
 
 
@@ -3284,6 +3548,12 @@ async function processProject() {
                 cutoff,
                 fs
             );
+
+
+        setStatus(
+            "Applying FIR filters...",
+            70
+        );
 
 
         const firSpeech =
@@ -3306,22 +3576,13 @@ async function processProject() {
             );
 
 
-        /* ====================================================
+        /* ----------------------------------------------------
            IIR
-           ==================================================== */
+           ---------------------------------------------------- */
 
         setStatus(
-            "Running IIR Butterworth filters...",
-            77
-        );
-
-
-        await new Promise(
-            resolve =>
-                setTimeout(
-                    resolve,
-                    20
-                )
+            "Applying IIR Butterworth filters...",
+            80
         );
 
 
@@ -3349,26 +3610,25 @@ async function processProject() {
             );
 
 
-        /* ====================================================
+        /* ----------------------------------------------------
            REFERENCE FILES
-           ==================================================== */
+           ---------------------------------------------------- */
 
         setStatus(
-            "Loading optional reference files...",
-            87
+            "Loading optional reference signals...",
+            86
         );
 
 
-        let speechRef =
+        let speechReference =
             null;
 
-
-        let musicRef =
+        let musicReference =
             null;
 
 
         if (
-            $("speechFile").files[0]
+            $("speechFile")?.files[0]
         ) {
 
             const reference =
@@ -3382,12 +3642,12 @@ async function processProject() {
             ) {
 
                 throw new Error(
-                    "Speech reference sampling rate does not match the mixed input."
+                    "Speech reference sampling rate does not match the mixed signal."
                 );
             }
 
 
-            speechRef =
+            speechReference =
                 normalize(
                     reference.samples
                         .slice(
@@ -3399,7 +3659,7 @@ async function processProject() {
 
 
         if (
-            $("musicFile").files[0]
+            $("musicFile")?.files[0]
         ) {
 
             const reference =
@@ -3413,12 +3673,12 @@ async function processProject() {
             ) {
 
                 throw new Error(
-                    "Music reference sampling rate does not match the mixed input."
+                    "Music reference sampling rate does not match the mixed signal."
                 );
             }
 
 
-            musicRef =
+            musicReference =
                 normalize(
                     reference.samples
                         .slice(
@@ -3429,22 +3689,20 @@ async function processProject() {
         }
 
 
-        /* ====================================================
-           OUTPUTS
-           ==================================================== */
+        /* ----------------------------------------------------
+           AUDIO OUTPUTS
+           ---------------------------------------------------- */
 
         setStatus(
-            "Creating audio outputs and graphs...",
-            91
+            "Creating audio outputs...",
+            90
         );
 
-
-        /* FFT */
 
         attachAudio(
             "fftSpeechAudio",
             "fftSpeechDownload",
-            fftOut.speech,
+            fftOutput.speech,
             fs,
             "FFT_Speech.wav"
         );
@@ -3453,13 +3711,11 @@ async function processProject() {
         attachAudio(
             "fftMusicAudio",
             "fftMusicDownload",
-            fftOut.music,
+            fftOutput.music,
             fs,
             "FFT_Music.wav"
         );
 
-
-        /* FIR */
 
         attachAudio(
             "firSpeechAudio",
@@ -3479,8 +3735,6 @@ async function processProject() {
         );
 
 
-        /* IIR */
-
         attachAudio(
             "iirSpeechAudio",
             "iirSpeechDownload",
@@ -3499,9 +3753,15 @@ async function processProject() {
         );
 
 
-        /* ====================================================
+        /* ----------------------------------------------------
            INDIVIDUAL WAVEFORMS
-           ==================================================== */
+           ---------------------------------------------------- */
+
+        setStatus(
+            "Drawing time-domain waveforms...",
+            93
+        );
+
 
         drawWave(
             "waveMix",
@@ -3513,7 +3773,7 @@ async function processProject() {
 
         drawWave(
             "waveFftSpeech",
-            fftOut.speech,
+            fftOutput.speech,
             fs,
             "FFT Speech"
         );
@@ -3521,7 +3781,7 @@ async function processProject() {
 
         drawWave(
             "waveFftMusic",
-            fftOut.music,
+            fftOutput.music,
             fs,
             "FFT Music"
         );
@@ -3559,9 +3819,15 @@ async function processProject() {
         );
 
 
-        /* ====================================================
+        /* ----------------------------------------------------
            INDIVIDUAL SPECTRA
-           ==================================================== */
+           ---------------------------------------------------- */
+
+        setStatus(
+            "Drawing frequency spectra...",
+            95
+        );
+
 
         drawSpectrum(
             "specMix",
@@ -3574,7 +3840,7 @@ async function processProject() {
 
         drawSpectrum(
             "specFftSpeech",
-            fftOut.speech,
+            fftOutput.speech,
             fs,
             "FFT Speech Spectrum",
             cutoff
@@ -3583,7 +3849,7 @@ async function processProject() {
 
         drawSpectrum(
             "specFftMusic",
-            fftOut.music,
+            fftOutput.music,
             fs,
             "FFT Music Spectrum",
             cutoff
@@ -3626,163 +3892,173 @@ async function processProject() {
         );
 
 
-        /* ====================================================
-           OVERALL WAVEFORM
-           ==================================================== */
+        /* ----------------------------------------------------
+           OVERALL COMPARISONS
+           ---------------------------------------------------- */
 
         drawOverallWave(
             "overallWave",
             [
-
                 {
                     data: mix
                 },
-
                 {
-                    data: fftOut.speech
+                    data: fftOutput.speech
                 },
-
                 {
                     data: firSpeech
                 },
-
                 {
                     data: iirSpeech
                 }
-
             ],
             fs
         );
 
-
-        /* ====================================================
-           OVERALL SPECTRUM
-           ==================================================== */
 
         drawOverallSpec(
             "overallSpec",
             [
-
                 {
                     data: mix
                 },
-
                 {
-                    data: fftOut.speech
+                    data: fftOutput.speech
                 },
-
                 {
                     data: firSpeech
                 },
-
                 {
                     data: iirSpeech
                 }
-
             ],
             fs
         );
 
 
-        /* ====================================================
+        /* ----------------------------------------------------
            PERFORMANCE TABLE
-           ==================================================== */
+           ---------------------------------------------------- */
 
-        const tbody =
+        if (
             $("metricsTable")
-                .querySelector(
-                    "tbody"
-                );
+        ) {
+
+            const tbody =
+                $("metricsTable")
+                    .querySelector("tbody");
 
 
-        tbody.innerHTML =
+            if (tbody) {
 
-            metricsRow(
-                "FFT",
-                fftOut.speech,
-                fftOut.music,
-                speechRef,
-                musicRef
-            )
+                tbody.innerHTML =
 
-            +
+                    metricsRow(
+                        "FFT",
+                        fftOutput.speech,
+                        fftOutput.music,
+                        speechReference,
+                        musicReference
+                    )
 
-            metricsRow(
-                "FIR",
-                firSpeech,
-                firMusic,
-                speechRef,
-                musicRef
-            )
+                    +
 
-            +
+                    metricsRow(
+                        "FIR",
+                        firSpeech,
+                        firMusic,
+                        speechReference,
+                        musicReference
+                    )
 
-            metricsRow(
-                "IIR",
-                iirSpeech,
-                iirMusic,
-                speechRef,
-                musicRef
-            );
+                    +
 
-
-        /* ====================================================
-           SHOW RESULTS
-           ==================================================== */
-
-        $("results")
-            .classList
-            .remove("hidden");
+                    metricsRow(
+                        "IIR",
+                        iirSpeech,
+                        iirMusic,
+                        speechReference,
+                        musicReference
+                    );
+            }
+        }
 
 
-        setStatus(
-            `Completed successfully • ${mix.length.toLocaleString()} samples • ${(mix.length / fs).toFixed(2)} seconds • Cutoff ${cutoff} Hz`,
-            100
-        );
-
-
-        window.scrollTo({
-
-            top:
-                $("results")
-                    .offsetTop - 20,
-
-            behavior:
-                "smooth"
-        });
-
+        /* ----------------------------------------------------
+           SAVE RESULT
+           ---------------------------------------------------- */
 
         lastResult = {
 
             fs,
-
             mix,
 
-            fftOut,
+            fftSpeech:
+                fftOutput.speech,
+
+            fftMusic:
+                fftOutput.music,
 
             firSpeech,
-
             firMusic,
 
             iirSpeech,
+            iirMusic,
 
-            iirMusic
+            cutoff
         };
+
+
+        /* ----------------------------------------------------
+           SHOW RESULTS
+           ---------------------------------------------------- */
+
+        if ($("results")) {
+
+            $("results")
+                .classList
+                .remove("hidden");
+        }
+
+
+        setStatus(
+            `Completed successfully • ${(mix.length / fs).toFixed(2)} seconds • ${fs} Hz • Cutoff ${cutoff} Hz`,
+            100
+        );
+
+
+        /*
+           Scroll to results.
+        */
+
+        setTimeout(() => {
+
+            if ($("results")) {
+
+                $("results").scrollIntoView({
+                    behavior: "smooth",
+                    block: "start"
+                });
+            }
+
+        }, 150);
 
 
     } catch (error) {
 
-        console.error(error);
+        console.error(
+            "DSP processing error:",
+            error
+        );
 
 
         setStatus(
             "Error: " +
             (
                 error.message ||
-                error
+                "Unable to process audio."
             )
         );
-
 
     } finally {
 
@@ -3793,235 +4069,226 @@ async function processProject() {
 
 
 /* ============================================================
-   PROGRESS CALLBACK
+   START BUTTON
    ============================================================ */
 
-function setProgress(
-    value
-) {
+if ($("startBtn")) {
 
-    setStatus(
-        `FFT separation in progress... ${value.toFixed(0)}%`,
-        value
-    );
+    $("startBtn")
+        .addEventListener(
+            "click",
+            processProject
+        );
 }
 
 
 /* ============================================================
-   START BUTTON
+   RESPONSIVE REDRAW
    ============================================================ */
 
-$("startBtn")
-    .addEventListener(
-        "click",
-        processProject
-    );
+let resizeTimer = null;
 
-
-/* ============================================================
-   WINDOW RESIZE
-   Redraw graphs after resizing.
-   ============================================================ */
 
 window.addEventListener(
     "resize",
     () => {
 
-        if (!lastResult) {
-            return;
-        }
+        clearTimeout(
+            resizeTimer
+        );
 
 
-        const {
-            fs,
-            mix,
-            fftOut,
-            firSpeech,
-            firMusic,
-            iirSpeech,
-            iirMusic
-        } =
-            lastResult;
+        resizeTimer =
+            setTimeout(
+                () => {
+
+                    if (!lastResult) {
+                        return;
+                    }
 
 
-        const cutoff =
-            Number(
-                $("cutoff").value
+                    const {
+
+                        fs,
+                        mix,
+                        fftSpeech,
+                        fftMusic,
+                        firSpeech,
+                        firMusic,
+                        iirSpeech,
+                        iirMusic,
+                        cutoff
+
+                    } =
+                        lastResult;
+
+
+                    /* Waveforms */
+
+                    drawWave(
+                        "waveMix",
+                        mix,
+                        fs,
+                        "Mixed Input"
+                    );
+
+
+                    drawWave(
+                        "waveFftSpeech",
+                        fftSpeech,
+                        fs,
+                        "FFT Speech"
+                    );
+
+
+                    drawWave(
+                        "waveFftMusic",
+                        fftMusic,
+                        fs,
+                        "FFT Music"
+                    );
+
+
+                    drawWave(
+                        "waveFirSpeech",
+                        firSpeech,
+                        fs,
+                        "FIR Speech"
+                    );
+
+
+                    drawWave(
+                        "waveFirMusic",
+                        firMusic,
+                        fs,
+                        "FIR Music"
+                    );
+
+
+                    drawWave(
+                        "waveIirSpeech",
+                        iirSpeech,
+                        fs,
+                        "IIR Speech"
+                    );
+
+
+                    drawWave(
+                        "waveIirMusic",
+                        iirMusic,
+                        fs,
+                        "IIR Music"
+                    );
+
+
+                    /* Spectra */
+
+                    drawSpectrum(
+                        "specMix",
+                        mix,
+                        fs,
+                        "Mixed Input Spectrum",
+                        cutoff
+                    );
+
+
+                    drawSpectrum(
+                        "specFftSpeech",
+                        fftSpeech,
+                        fs,
+                        "FFT Speech Spectrum",
+                        cutoff
+                    );
+
+
+                    drawSpectrum(
+                        "specFftMusic",
+                        fftMusic,
+                        fs,
+                        "FFT Music Spectrum",
+                        cutoff
+                    );
+
+
+                    drawSpectrum(
+                        "specFirSpeech",
+                        firSpeech,
+                        fs,
+                        "FIR Speech Spectrum",
+                        cutoff
+                    );
+
+
+                    drawSpectrum(
+                        "specFirMusic",
+                        firMusic,
+                        fs,
+                        "FIR Music Spectrum",
+                        cutoff
+                    );
+
+
+                    drawSpectrum(
+                        "specIirSpeech",
+                        iirSpeech,
+                        fs,
+                        "IIR Speech Spectrum",
+                        cutoff
+                    );
+
+
+                    drawSpectrum(
+                        "specIirMusic",
+                        iirMusic,
+                        fs,
+                        "IIR Music Spectrum",
+                        cutoff
+                    );
+
+
+                    /* Overall */
+
+                    drawOverallWave(
+                        "overallWave",
+                        [
+                            {
+                                data: mix
+                            },
+                            {
+                                data: fftSpeech
+                            },
+                            {
+                                data: firSpeech
+                            },
+                            {
+                                data: iirSpeech
+                            }
+                        ],
+                        fs
+                    );
+
+
+                    drawOverallSpec(
+                        "overallSpec",
+                        [
+                            {
+                                data: mix
+                            },
+                            {
+                                data: fftSpeech
+                            },
+                            {
+                                data: firSpeech
+                            },
+                            {
+                                data: iirSpeech
+                            }
+                        ],
+                        fs
+                    );
+
+                },
+                250
             );
-
-
-        /* Waveforms */
-
-        drawWave(
-            "waveMix",
-            mix,
-            fs,
-            "Mixed Input"
-        );
-
-
-        drawWave(
-            "waveFftSpeech",
-            fftOut.speech,
-            fs,
-            "FFT Speech"
-        );
-
-
-        drawWave(
-            "waveFftMusic",
-            fftOut.music,
-            fs,
-            "FFT Music"
-        );
-
-
-        drawWave(
-            "waveFirSpeech",
-            firSpeech,
-            fs,
-            "FIR Speech"
-        );
-
-
-        drawWave(
-            "waveFirMusic",
-            firMusic,
-            fs,
-            "FIR Music"
-        );
-
-
-        drawWave(
-            "waveIirSpeech",
-            iirSpeech,
-            fs,
-            "IIR Speech"
-        );
-
-
-        drawWave(
-            "waveIirMusic",
-            iirMusic,
-            fs,
-            "IIR Music"
-        );
-
-
-        /* Spectra */
-
-        drawSpectrum(
-            "specMix",
-            mix,
-            fs,
-            "Mixed Input Spectrum",
-            cutoff
-        );
-
-
-        drawSpectrum(
-            "specFftSpeech",
-            fftOut.speech,
-            fs,
-            "FFT Speech Spectrum",
-            cutoff
-        );
-
-
-        drawSpectrum(
-            "specFftMusic",
-            fftOut.music,
-            fs,
-            "FFT Music Spectrum",
-            cutoff
-        );
-
-
-        drawSpectrum(
-            "specFirSpeech",
-            firSpeech,
-            fs,
-            "FIR Speech Spectrum",
-            cutoff
-        );
-
-
-        drawSpectrum(
-            "specFirMusic",
-            firMusic,
-            fs,
-            "FIR Music Spectrum",
-            cutoff
-        );
-
-
-        drawSpectrum(
-            "specIirSpeech",
-            iirSpeech,
-            fs,
-            "IIR Speech Spectrum",
-            cutoff
-        );
-
-
-        drawSpectrum(
-            "specIirMusic",
-            iirMusic,
-            fs,
-            "IIR Music Spectrum",
-            cutoff
-        );
-
-
-        /* Overall */
-
-        drawOverallWave(
-            "overallWave",
-            [
-
-                {
-                    data: mix
-                },
-
-                {
-                    data: fftOut.speech
-                },
-
-                {
-                    data: firSpeech
-                },
-
-                {
-                    data: iirSpeech
-                }
-
-            ],
-            fs
-        );
-
-
-        drawOverallSpec(
-            "overallSpec",
-            [
-
-                {
-                    data: mix
-                },
-
-                {
-                    data: fftOut.speech
-                },
-
-                {
-                    data: firSpeech
-                },
-
-                {
-                    data: iirSpeech
-                }
-
-            ],
-            fs
-        );
     }
 );
